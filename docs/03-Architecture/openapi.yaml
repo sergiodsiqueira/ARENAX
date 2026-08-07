@@ -1,0 +1,136 @@
+openapi: 3.1.0
+info:
+  title: ARENAX Core API
+  version: 0.1.0
+paths:
+  /api/v1/people:
+    post:
+      operationId: createPerson
+      requestBody: {$ref: '#/components/requestBodies/NamedResource'}
+      responses: {'201': {$ref: '#/components/responses/Created'}}
+  /api/v1/spaces:
+    post:
+      operationId: createSpace
+      requestBody: {$ref: '#/components/requestBodies/NamedResource'}
+      responses: {'201': {$ref: '#/components/responses/Created'}}
+  /api/v1/equipments:
+    post:
+      operationId: createEquipment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/EquipmentInput'}
+      responses: {'201': {$ref: '#/components/responses/Created'}}
+  /api/v1/sessions:
+    post:
+      operationId: createSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SessionInput'}
+      responses:
+        '201': {$ref: '#/components/responses/Session'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /api/v1/sessions/{sessionId}/actions/{action}:
+    post:
+      operationId: transitionSession
+      parameters:
+        - {name: sessionId, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: action, in: path, required: true, schema: {type: string, enum: [start, finish, cancel]}}
+      responses: {'200': {$ref: '#/components/responses/Session'}, '409': {$ref: '#/components/responses/Conflict'}}
+  /api/v1/sessions/{sessionId}:
+    get:
+      operationId: getSessionDossier
+      parameters:
+        - {name: sessionId, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200': {description: Session dossier including Moments and Timeline}
+        '404': {description: Session not found}
+  /api/v1/sessions/{sessionId}/extend:
+    post:
+      operationId: extendSession
+      parameters:
+        - {name: sessionId, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [scheduled_end]
+              properties: {scheduled_end: {type: string, format: date-time}}
+      responses: {'200': {$ref: '#/components/responses/Session'}, '409': {$ref: '#/components/responses/Conflict'}}
+  /api/v1/events/button-pressed:
+    post:
+      operationId: registerButtonPress
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 8}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ButtonPress'}
+      responses:
+        '202':
+          description: Physical event audited; accepted indicates whether a Moment was requested.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ButtonPressResult'}
+components:
+  requestBodies:
+    NamedResource:
+      required: true
+      content: {application/json: {schema: {type: object, required: [name], properties: {name: {type: string}}}}}
+  responses:
+    Created:
+      description: Created
+      content: {application/json: {schema: {type: object, properties: {id: {type: string, format: uuid}}}}}
+    Session:
+      description: Session state
+      content: {application/json: {schema: {$ref: '#/components/schemas/Session'}}}
+    Conflict:
+      description: Domain invariant rejected the intention
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+  schemas:
+    EquipmentInput:
+      type: object
+      required: [space_id, kind, external_id]
+      properties:
+        space_id: {type: string, format: uuid}
+        kind: {type: string, enum: [camera, ax_device]}
+        external_id: {type: string}
+        configuration: {type: object}
+    SessionInput:
+      type: object
+      required: [responsible_person_id, space_ids, scheduled_start, scheduled_end]
+      properties:
+        responsible_person_id: {type: string, format: uuid}
+        space_ids: {type: array, minItems: 1, items: {type: string, format: uuid}}
+        scheduled_start: {type: string, format: date-time}
+        scheduled_end: {type: string, format: date-time}
+    Session:
+      allOf:
+        - {$ref: '#/components/schemas/SessionInput'}
+        - type: object
+          properties:
+            id: {type: string, format: uuid}
+            status: {type: string}
+            actual_start: {type: [string, 'null'], format: date-time}
+            actual_end: {type: [string, 'null'], format: date-time}
+    ButtonPress:
+      type: object
+      required: [device_id, timestamp]
+      properties: {device_id: {type: string}, timestamp: {type: string, format: date-time}}
+    ButtonPressResult:
+      type: object
+      required: [accepted, reason]
+      properties:
+        accepted: {type: boolean}
+        reason: {type: string}
+        moment_id: {type: [string, 'null'], format: uuid}
+        session_id: {type: [string, 'null'], format: uuid}
+    Error:
+      type: object
+      properties: {code: {type: string}, message: {type: string}}

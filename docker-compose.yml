@@ -1,0 +1,46 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: arenax
+      POSTGRES_USER: arenax
+      POSTGRES_PASSWORD: arenax
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U arenax"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  migrate:
+    build: ./apps/api
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build: ./apps/api
+    environment:
+      ARENAX_DATABASE_URL: postgresql+asyncpg://arenax:arenax@postgres:5432/arenax
+    ports:
+      - "8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  replay-worker:
+    build: ./services/replay-worker
+    environment:
+      DATABASE_URL: postgresql://arenax:arenax@postgres:5432/arenax
+      MEDIA_ROOT: /media
+    volumes:
+      - ./media:/media
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  postgres-data:
+
