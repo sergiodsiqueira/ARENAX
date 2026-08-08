@@ -20,7 +20,7 @@ O contrato versionado está em `docs/03-Architecture/openapi.yaml`. A documenta�
 interativa do runtime fica em `/docs`.
 
 ## Limite consciente do primeiro slice
-O adapter de vídeo usa `configuration.source_path` de uma Câmera apontando para um
-arquivo local continuamente atualizado. Buffer RTSP segmentado, retenção e múltiplas
-câmeras permanecem como evolução do Capture Service, sem alterar domínio ou firmware.
-
+O Capture Service usa `configuration.capture_url`, mantém buffer segmentado com
+retenção e captura todas as Câmeras configuradas. O Replay Worker seleciona a
+primeira Câmera do Espaço; política de composição ou escolha entre múltiplas Câmeras
+permanece como evolução, sem alterar domínio ou firmware.
