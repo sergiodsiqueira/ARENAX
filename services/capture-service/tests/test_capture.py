@@ -19,6 +19,13 @@ def test_rtsp_camera_uses_tcp_and_segment_output(tmp_path):
     assert camera.capture_url in command
 
 
+def test_rtsp_camera_can_use_udp(tmp_path):
+    camera = capture_service.Camera(uuid4(), "rtsp://camera/stream", rtsp_transport="udp")
+    command = capture_service.build_ffmpeg_command(camera, tmp_path / "%Y.mp4")
+    transport_index = command.index("-rtsp_transport")
+    assert command[transport_index + 1] == "udp"
+
+
 def test_loop_is_enabled_only_when_configured(tmp_path):
     camera = capture_service.Camera(uuid4(), "/media/source.mp4", loop=True)
     command = capture_service.build_ffmpeg_command(camera, tmp_path / "%Y.mp4")

@@ -31,6 +31,9 @@ Para uma Câmera do adapter de desenvolvimento, informe
 `configuration.capture_url` com uma URL RTSP ou arquivo visível em `/media`. O
 Capture Service mantém segmentos em `media/buffers/`, aplica retenção e publica
 saúde em `media/capture-health/`. Replays são gravados em `media/replays/`.
+O MediaMTX recebe publicações RTSP do host em `rtsp://localhost:8554/<path>`.
+Para publicar temporariamente a webcam do navegador, abra
+`http://localhost:8889/live/publish` e permita o acesso à câmera.
 
 Testes do backend:
 

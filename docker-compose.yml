@@ -44,6 +44,15 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  mediamtx:
+    image: bluenviron/mediamtx:1.18.2
+    environment:
+      MTX_WEBRTCADDITIONALHOSTS: ${ARENAX_WEBRTC_HOST:-127.0.0.1}
+    ports:
+      - "8554:8554"
+      - "8889:8889"
+      - "8189:8189/udp"
+
   capture-service:
     build: ./services/capture-service
     environment:
@@ -56,6 +65,8 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+      mediamtx:
+        condition: service_started
 
   replay-worker:
     build: ./services/replay-worker

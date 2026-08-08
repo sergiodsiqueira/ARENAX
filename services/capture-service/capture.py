@@ -22,6 +22,7 @@ class Camera:
     id: UUID
     capture_url: str
     loop: bool = False
+    rtsp_transport: str = "tcp"
 
 
 def camera_from_row(row) -> Camera | None:
@@ -31,13 +32,18 @@ def camera_from_row(row) -> Camera | None:
     capture_url = configuration.get("capture_url")
     if not capture_url:
         return None
-    return Camera(row["id"], capture_url, bool(configuration.get("loop", False)))
+    rtsp_transport = configuration.get("rtsp_transport", "tcp")
+    if rtsp_transport not in {"tcp", "udp", "udp_multicast"}:
+        rtsp_transport = "tcp"
+    return Camera(
+        row["id"], capture_url, bool(configuration.get("loop", False)), rtsp_transport
+    )
 
 
 def build_ffmpeg_command(camera: Camera, output_pattern: Path) -> list[str]:
     command = ["ffmpeg", "-hide_banner", "-loglevel", "warning"]
     if camera.capture_url.lower().startswith("rtsp://"):
-        command.extend(["-rtsp_transport", "tcp"])
+        command.extend(["-rtsp_transport", camera.rtsp_transport])
     if camera.loop:
         command.extend(["-stream_loop", "-1"])
     command.extend([
@@ -87,7 +93,6 @@ async def capture(camera: Camera) -> None:
         except asyncio.CancelledError:
             process.terminate()
             await process.wait()
-            write_health(camera.id, "stopped")
             raise
         message = stderr.decode(errors="replace")[-1000:] or f"ffmpeg exited {process.returncode}"
         write_health(camera.id, "failed", message)
