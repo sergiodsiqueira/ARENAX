@@ -3,11 +3,24 @@ from uuid import UUID
 
 from sqlalchemy import or_, select
 
+from arenax.domain.identity import User, UserRole, UserStatus
 from arenax.domain.moment import Moment
 from arenax.domain.session import BLOCKING_STATUSES, Session, SessionStatus
+
 from .database import session_factory
-from .models import EquipmentModel, MomentModel, OutboxModel, PersonModel, PhysicalEventModel
-from .models import SessionModel, SessionSpaceModel, SpaceModel, TimelineModel
+from .models import (
+    AccessModel,
+    EquipmentModel,
+    MomentModel,
+    OutboxModel,
+    PersonModel,
+    PhysicalEventModel,
+    SessionModel,
+    SessionSpaceModel,
+    SpaceModel,
+    TimelineModel,
+    UserModel,
+)
 
 
 class SqlAlchemyUnitOfWork:
@@ -122,6 +135,37 @@ class SqlAlchemyUnitOfWork:
         await self.session.flush()
         return model.id
 
+    async def list_people(self) -> list[dict]:
+        models = list(await self.session.scalars(select(PersonModel).order_by(PersonModel.name)))
+        return [{"id": model.id, "name": model.name} for model in models]
+
+    async def list_spaces(self) -> list[dict]:
+        models = list(await self.session.scalars(select(SpaceModel).order_by(SpaceModel.name)))
+        return [
+            {
+                "id": model.id,
+                "name": model.name,
+                "administrative_status": model.administrative_status,
+            }
+            for model in models
+        ]
+
+    async def list_equipments(self, space_id: UUID | None = None) -> list[dict]:
+        query = select(EquipmentModel).order_by(EquipmentModel.kind, EquipmentModel.external_id)
+        if space_id is not None:
+            query = query.where(EquipmentModel.space_id == space_id)
+        models = list(await self.session.scalars(query))
+        return [
+            {
+                "id": model.id,
+                "space_id": model.space_id,
+                "kind": model.kind,
+                "external_id": model.external_id,
+                "configuration": model.configuration,
+            }
+            for model in models
+        ]
+
     async def session_dossier(self, session_id: UUID) -> dict | None:
         model = await self.session.get(SessionModel, session_id)
         if not model:
@@ -144,6 +188,101 @@ class SqlAlchemyUnitOfWork:
                           "data": item.data} for item in timeline],
         }
 
+    async def list_sessions(
+        self, start: datetime, end: datetime, space_id: UUID | None = None
+    ) -> list[Session]:
+        query = (
+            select(SessionModel)
+            .where(
+                SessionModel.scheduled_start < end,
+                SessionModel.scheduled_end > start,
+            )
+            .order_by(SessionModel.scheduled_start, SessionModel.id)
+        )
+        if space_id is not None:
+            query = query.join(SessionSpaceModel).where(SessionSpaceModel.space_id == space_id)
+        models = list(await self.session.scalars(query))
+        if not models:
+            return []
+        session_ids = [model.id for model in models]
+        rows = (await self.session.execute(
+            select(SessionSpaceModel.session_id, SessionSpaceModel.space_id)
+            .where(SessionSpaceModel.session_id.in_(session_ids))
+            .order_by(SessionSpaceModel.session_id, SessionSpaceModel.space_id)
+        )).all()
+        spaces_by_session: dict[UUID, list[UUID]] = {session_id: [] for session_id in session_ids}
+        for session_id, item_space_id in rows:
+            spaces_by_session[session_id].append(item_space_id)
+        return [
+            self._to_domain(model, tuple(spaces_by_session[model.id])) for model in models
+        ]
+
+    async def get_user_by_email(self, email: str) -> User | None:
+        model = await self.session.scalar(select(UserModel).where(UserModel.email == email))
+        return self._user_to_domain(model) if model else None
+
+    async def get_user_by_access(self, token_hash: str, now: datetime) -> User | None:
+        model = await self.session.scalar(
+            select(UserModel)
+            .join(AccessModel, AccessModel.user_id == UserModel.id)
+            .where(
+                AccessModel.token_hash == token_hash,
+                AccessModel.revoked_at.is_(None),
+                AccessModel.expires_at > now,
+            )
+        )
+        return self._user_to_domain(model) if model else None
+
+    async def add_user(
+        self, name: str, email: str, password_hash: str, role: UserRole, now: datetime
+    ) -> User:
+        model = UserModel(
+            name=name,
+            email=email,
+            password_hash=password_hash,
+            role=role.value,
+            status=UserStatus.ACTIVE.value,
+            created_at=now,
+            updated_at=now,
+        )
+        self.session.add(model)
+        await self.session.flush()
+        return self._user_to_domain(model)
+
+    async def add_access(
+        self,
+        user_id: UUID,
+        token_hash: str,
+        now: datetime,
+        expires_at: datetime,
+        persistent: bool,
+    ) -> None:
+        self.session.add(
+            AccessModel(
+                user_id=user_id,
+                token_hash=token_hash,
+                created_at=now,
+                expires_at=expires_at,
+                persistent=persistent,
+            )
+        )
+
+    async def revoke_access(self, token_hash: str, now: datetime) -> None:
+        access = await self.session.scalar(
+            select(AccessModel).where(
+                AccessModel.token_hash == token_hash,
+                AccessModel.revoked_at.is_(None),
+            )
+        )
+        if access:
+            access.revoked_at = now
+
+    async def register_last_access(self, user_id: UUID, now: datetime) -> None:
+        user = await self.session.get(UserModel, user_id)
+        if user:
+            user.last_access_at = now
+            user.updated_at = now
+
     @staticmethod
     def _to_model(item: Session) -> SessionModel:
         return SessionModel(id=item.id, responsible_person_id=item.responsible_person_id,
@@ -157,3 +296,17 @@ class SqlAlchemyUnitOfWork:
             space_ids=spaces, scheduled_start=model.scheduled_start,
             scheduled_end=model.scheduled_end, status=SessionStatus(model.status),
             actual_start=model.actual_start, actual_end=model.actual_end)
+
+    @staticmethod
+    def _user_to_domain(model: UserModel) -> User:
+        return User(
+            id=model.id,
+            name=model.name,
+            email=model.email,
+            password_hash=model.password_hash,
+            role=UserRole(model.role),
+            status=UserStatus(model.status),
+            created_at=model.created_at,
+            updated_at=model.updated_at,
+            last_access_at=model.last_access_at,
+        )

@@ -1,5 +1,6 @@
 from datetime import datetime
 from uuid import UUID
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -51,3 +52,37 @@ class EquipmentRequest(BaseModel):
 
 class CreatedResourceResponse(BaseModel):
     id: UUID
+
+
+class NamedResourceResponse(BaseModel):
+    id: UUID
+    name: str
+
+
+class SpaceResponse(NamedResourceResponse):
+    administrative_status: str
+
+
+class EquipmentResponse(BaseModel):
+    id: UUID
+    space_id: UUID
+    kind: str
+    external_id: str
+    configuration: dict
+
+
+class LoginRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+    password: str = Field(min_length=1, max_length=1024)
+    remember: bool = False
+
+
+class UserResponse(BaseModel):
+    id: UUID
+    name: str
+    email: str
+    role: str
+
+
+class LoginResponse(BaseModel):
+    user: UserResponse

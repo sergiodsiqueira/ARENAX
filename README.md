@@ -54,6 +54,19 @@ arquivos de vídeo sintéticos ao terminar.
 O contrato versionado está em `docs/03-Architecture/openapi.yaml` e as decisões
 temporais/de entrega estão nos ADRs 011 e 012.
 
+## Primeiro acesso
+
+Após executar as migrations, crie o primeiro proprietário sem registrar a senha
+no histórico do terminal:
+
+```powershell
+docker compose run --rm api python -m arenax.cli.create_user `
+  --nome "Proprietário" `
+  --email "proprietario@arena.com.br" --papel proprietario
+```
+
+O login web fica em `http://localhost:5173/login` e usa cookie HttpOnly.
+
 ## Initial Structure
 
 ```text

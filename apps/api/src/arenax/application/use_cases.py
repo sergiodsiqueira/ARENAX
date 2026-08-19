@@ -6,8 +6,6 @@ from arenax.domain.errors import EntityNotFound, SessionConflict
 from arenax.domain.moment import Moment
 from arenax.domain.session import Session
 
-from .ports import UnitOfWork
-
 
 @dataclass(frozen=True)
 class ButtonPressResult:
@@ -46,6 +44,16 @@ class SessionService:
             if dossier is None:
                 raise EntityNotFound("Session not found")
             return dossier
+
+    async def agenda(
+        self, start: datetime, end: datetime, space_id: UUID | None = None
+    ) -> list[Session]:
+        Session._require_aware(start)
+        Session._require_aware(end)
+        if end <= start:
+            raise ValueError("end must be after start")
+        async with self._uow_factory() as uow:
+            return await uow.list_sessions(start, end, space_id)
 
     async def transition(self, session_id: UUID, action: str, now: datetime, new_end=None) -> Session:
         async with self._uow_factory() as uow:
@@ -137,3 +145,15 @@ class ArenaInfrastructureService:
             entity_id = await uow.add_equipment(space_id, kind, external_id, configuration)
             await uow.commit()
             return entity_id
+
+    async def list_people(self) -> list[dict]:
+        async with self._uow_factory() as uow:
+            return await uow.list_people()
+
+    async def list_spaces(self) -> list[dict]:
+        async with self._uow_factory() as uow:
+            return await uow.list_spaces()
+
+    async def list_equipments(self, space_id: UUID | None = None) -> list[dict]:
+        async with self._uow_factory() as uow:
+            return await uow.list_equipments(space_id)

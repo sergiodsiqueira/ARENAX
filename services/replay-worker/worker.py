@@ -79,28 +79,28 @@ async def generate_buffered_replay(buffer_dir: Path, occurred_at: datetime, outp
 async def process_one(connection) -> bool:
     async with connection.transaction():
         job = await connection.fetchrow("""
-            SELECT id, aggregate_id, payload FROM outbox
-            WHERE kind = 'ReplayRequested' AND published_at IS NULL
+            SELECT id, agregado_id, dados FROM caixa_de_saida
+            WHERE tipo = 'ReplayRequested' AND publicado_em IS NULL
             ORDER BY id FOR UPDATE SKIP LOCKED LIMIT 1
         """)
         if not job:
             return False
-        payload = job["payload"] if isinstance(job["payload"], dict) else json.loads(job["payload"])
+        payload = job["dados"] if isinstance(job["dados"], dict) else json.loads(job["dados"])
         camera = await connection.fetchrow("""
-            SELECT id, configuration FROM equipments
-            WHERE space_id = $1 AND kind = 'camera' ORDER BY id LIMIT 1
+            SELECT id, configuracao FROM equipamentos
+            WHERE espaco_id = $1 AND tipo = 'camera' ORDER BY id LIMIT 1
         """, UUID(payload["spaceId"]))
         try:
             if not camera:
                 raise RuntimeError("No camera configured for Space")
-            configuration = camera["configuration"]
+            configuration = camera["configuracao"]
             if isinstance(configuration, str):
                 configuration = json.loads(configuration)
             output = MEDIA_ROOT / "replays" / f"{payload['momentId']}.mp4"
-            await connection.execute("UPDATE moments SET status='processing' WHERE id=$1",
+            await connection.execute("UPDATE momentos SET status='processing' WHERE id=$1",
                                      UUID(payload["momentId"]))
             moment_at = await connection.fetchval(
-                "SELECT occurred_at FROM moments WHERE id=$1", UUID(payload["momentId"])
+                "SELECT ocorrido_em FROM momentos WHERE id=$1", UUID(payload["momentId"])
             )
             if configuration.get("capture_url"):
                 await generate_buffered_replay(MEDIA_ROOT / "buffers" / str(camera["id"]), moment_at, output)
@@ -108,20 +108,22 @@ async def process_one(connection) -> bool:
                 await generate_replay(configuration["source_path"], output)
             else:
                 raise RuntimeError("Camera configuration.capture_url is required")
-            await connection.execute("UPDATE moments SET status='ready', replay_path=$2 WHERE id=$1",
+            await connection.execute("UPDATE momentos SET status='ready', caminho_replay=$2 WHERE id=$1",
                                      UUID(payload["momentId"]), str(output))
-            await connection.execute("""INSERT INTO timeline
-                (id, session_id, kind, occurred_at, data)
+            await connection.execute("""INSERT INTO linha_do_tempo
+                (id, sessao_id, tipo, ocorrido_em, dados)
                 VALUES(gen_random_uuid(), $1, 'ReplayGenerated', now(), $2::json)""",
                 UUID(payload["sessionId"]), json.dumps({"momentId": payload["momentId"]}))
         except Exception as exc:
-            await connection.execute("UPDATE moments SET status='failed' WHERE id=$1",
+            await connection.execute("UPDATE momentos SET status='failed' WHERE id=$1",
                                      UUID(payload["momentId"]))
-            await connection.execute("""INSERT INTO timeline
-                (id, session_id, kind, occurred_at, data)
+            await connection.execute("""INSERT INTO linha_do_tempo
+                (id, sessao_id, tipo, ocorrido_em, dados)
                 VALUES(gen_random_uuid(), $1, 'ReplayGenerationFailed', now(), $2::json)""",
                 UUID(payload["sessionId"]), json.dumps({"error": str(exc)}))
-        await connection.execute("UPDATE outbox SET published_at=now() WHERE id=$1", job["id"])
+        await connection.execute(
+            "UPDATE caixa_de_saida SET publicado_em=now() WHERE id=$1", job["id"]
+        )
         return True
 
 

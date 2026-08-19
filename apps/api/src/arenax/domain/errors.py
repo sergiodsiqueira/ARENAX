@@ -13,3 +13,14 @@ class SessionConflict(DomainError):
 class EntityNotFound(DomainError):
     pass
 
+
+class InvalidCredentials(DomainError):
+    """Authentication failed without revealing which credential was invalid."""
+
+
+class InvalidAccess(DomainError):
+    """An access token is absent, expired, revoked or unknown."""
+
+
+class ForbiddenAccess(DomainError):
+    """The authenticated User does not have the required role."""

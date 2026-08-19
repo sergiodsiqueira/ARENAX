@@ -11,6 +11,7 @@ A ARENAX é uma plataforma operacional para arenas esportivas. O MVP atende inic
 - `01-Product/`: visão, missão, manifesto e roadmap.
 - `02-Domain/`: Domain Book, linguagem, agregados, contexts, Event Storming e ADRs.
 - `03-Architecture/`: arquitetura, backend, frontend e contratos.
+  O esquema físico em português está em `03-Architecture/Database-Schema.md`.
 - `04-UX/`: Mission Control, Arena Designer, Sessão e Design System.
 - `05-Hardware/`: ESP32/AX Device e Replay.
 - `06-Planning/`: Sprint 0, Sprint 1 e backlog.

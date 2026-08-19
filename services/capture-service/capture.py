@@ -26,7 +26,7 @@ class Camera:
 
 
 def camera_from_row(row) -> Camera | None:
-    configuration = row["configuration"]
+    configuration = row["configuracao"]
     if isinstance(configuration, str):
         configuration = json.loads(configuration)
     capture_url = configuration.get("capture_url")
@@ -101,7 +101,7 @@ async def capture(camera: Camera) -> None:
 
 async def load_cameras(connection) -> dict[UUID, Camera]:
     rows = await connection.fetch(
-        "SELECT id, configuration FROM equipments WHERE kind = 'camera' ORDER BY id"
+        "SELECT id, configuracao FROM equipamentos WHERE tipo = 'camera' ORDER BY id"
     )
     cameras = (camera_from_row(row) for row in rows)
     return {camera.id: camera for camera in cameras if camera is not None}

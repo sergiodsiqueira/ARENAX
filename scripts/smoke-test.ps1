@@ -37,6 +37,9 @@ function Invoke-ArenaxApi {
     if ($Body) {
         $parameters.Body = $Body | ConvertTo-Json -Depth 6
     }
+    if ($script:webSession) {
+        $parameters.WebSession = $script:webSession
+    }
 
     Invoke-RestMethod @parameters
 }
@@ -55,6 +58,9 @@ $camera = $null
 $session = $null
 $event = $null
 $idempotencyKey = $null
+$userEmail = "smoke-user-$runId@arenax.local"
+$smokePassword = "Smoke-$runId-Aa1!"
+$script:webSession = New-Object Microsoft.PowerShell.Commands.WebRequestSession
 
 Push-Location $repositoryRoot
 try {
@@ -73,6 +79,18 @@ try {
         if (-not $health -or $health.status -ne "ok") { Start-Sleep -Seconds 1 }
     } until (($health -and $health.status -eq "ok") -or [DateTimeOffset]::UtcNow -ge $healthDeadline)
     if (-not $health -or $health.status -ne "ok") { throw "API did not become healthy." }
+
+    $env:ARENAX_INITIAL_USER_PASSWORD = $smokePassword
+    & $docker compose run --rm -e ARENAX_INITIAL_USER_PASSWORD api python `
+        -m arenax.cli.create_user --nome "Smoke Test User" --email $userEmail --papel proprietario
+    Remove-Item Env:ARENAX_INITIAL_USER_PASSWORD
+    if ($LASTEXITCODE -ne 0) { throw "Smoke User creation failed." }
+    $authenticated = Invoke-ArenaxApi -Method Post -Path "/auth/login" -Body @{
+        email = $userEmail
+        password = $smokePassword
+        remember = $false
+    }
+    if ($authenticated.user.email -ne $userEmail) { throw "Authentication failed." }
 
     Write-Host "Running API tests inside Docker..."
     & $docker compose run --rm api pytest -q
@@ -173,21 +191,27 @@ try {
     } | Format-List
 }
 finally {
+    Remove-Item Env:ARENAX_INITIAL_USER_PASSWORD -ErrorAction SilentlyContinue
     if ($session -and $event -and $space -and $person) {
         $cleanupSql = @"
-DELETE FROM outbox WHERE aggregate_id = '$($event.moment_id)';
-DELETE FROM timeline WHERE session_id = '$($session.id)';
-DELETE FROM physical_events WHERE idempotency_key = '$idempotencyKey';
-DELETE FROM moments WHERE session_id = '$($session.id)';
-DELETE FROM session_spaces WHERE session_id = '$($session.id)';
-DELETE FROM sessions WHERE id = '$($session.id)';
-DELETE FROM equipments WHERE space_id = '$($space.id)';
-DELETE FROM spaces WHERE id = '$($space.id)';
-DELETE FROM people WHERE id = '$($person.id)';
+DELETE FROM caixa_de_saida WHERE agregado_id = '$($event.moment_id)';
+DELETE FROM linha_do_tempo WHERE sessao_id = '$($session.id)';
+DELETE FROM eventos_fisicos WHERE chave_idempotencia = '$idempotencyKey';
+DELETE FROM momentos WHERE sessao_id = '$($session.id)';
+DELETE FROM sessao_espacos WHERE sessao_id = '$($session.id)';
+DELETE FROM sessoes WHERE id = '$($session.id)';
+DELETE FROM equipamentos WHERE espaco_id = '$($space.id)';
+DELETE FROM espacos WHERE id = '$($space.id)';
+DELETE FROM pessoas WHERE id = '$($person.id)';
 "@
         & $docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U arenax -d arenax -c $cleanupSql | Out-Null
         Start-Sleep -Seconds 6
     }
+    $userCleanupSql = @"
+DELETE FROM acessos WHERE usuario_id IN (SELECT id FROM usuarios WHERE email = '$userEmail');
+DELETE FROM usuarios WHERE email = '$userEmail';
+"@
+    & $docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U arenax -d arenax -c $userCleanupSql | Out-Null
     if (Test-Path -LiteralPath $sourcePath) {
         Remove-Item -LiteralPath $sourcePath -Force
     }
