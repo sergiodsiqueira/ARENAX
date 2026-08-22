@@ -26,8 +26,13 @@ services:
     build: ./apps/api
     environment:
       ARENAX_DATABASE_URL: postgresql+asyncpg://arenax:arenax@postgres:5432/arenax
+      ARENAX_MEDIAMTX_API_URL: http://mediamtx:9997
+      ARENAX_MEDIAMTX_PUBLIC_WEBRTC_URL: ${ARENAX_MEDIAMTX_PUBLIC_WEBRTC_URL:-http://localhost:8889}
+      ARENAX_LIVE_PATH_SECRET: ${ARENAX_LIVE_PATH_SECRET:-arenax-local-development}
     ports:
       - "8000:8000"
+    volumes:
+      - ./media:/media:ro
     healthcheck:
       test:
         - CMD
@@ -43,15 +48,19 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+      mediamtx:
+        condition: service_started
 
   mediamtx:
-    image: bluenviron/mediamtx:1.18.2
+    image: bluenviron/mediamtx:1.20.0
     environment:
       MTX_WEBRTCADDITIONALHOSTS: ${ARENAX_WEBRTC_HOST:-127.0.0.1}
     ports:
-      - "8554:8554"
       - "8889:8889"
       - "8189:8189/udp"
+    volumes:
+      - ./docker/mediamtx.yml:/mediamtx.yml:ro
+    restart: unless-stopped
 
   capture-service:
     build: ./services/capture-service
@@ -65,8 +74,6 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
-      mediamtx:
-        condition: service_started
 
   replay-worker:
     build: ./services/replay-worker

@@ -8,8 +8,8 @@ Operações conceituais: `Criar`, `Confirmar`, `Iniciar`, `Prorrogar`, `Registra
 ## Espaço
 Identidade, configuração, estado administrativo, capacidades e associação de Equipamentos. Estados como Disponível/Ocupado devem ser derivados das Sessões; Ativo/Manutenção/Desativado pertencem ao Espaço.
 
-## Pessoa
-Cadastro independente referenciado pela Sessão.
+## Cliente
+Cadastro independente de uma pessoa atendida pela Arena e referenciado pela Sessão.
 
 ## Equipamento
 Entidade com identidade, tipo, configuração, Espaço associado e estado operacional.

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from arenax.domain.errors import InvalidAccess, InvalidCredentials
+from arenax.domain.errors import EntityNotFound, ForbiddenAccess, InvalidAccess, InvalidCredentials
 from arenax.domain.identity import User, UserRole, UserStatus
 
 
@@ -68,15 +68,27 @@ class UserAdministrationService:
         self._uow_factory = uow_factory
         self._password_hasher = password_hasher
 
+    @staticmethod
+    def _can_manage(actor: User, target_role: UserRole) -> None:
+        if actor.role is UserRole.ADMINISTRATOR and target_role is UserRole.OWNER:
+            raise ForbiddenAccess("Administrador não pode gerenciar Proprietário")
+
+    @staticmethod
+    def _validate_password(password: str) -> None:
+        if len(password) < 12:
+            raise ValueError("A senha deve possuir ao menos 12 caracteres")
+
     async def create_user(
-        self, name: str, email: str, password: str, role: UserRole, now: datetime
+        self, name: str, email: str, password: str, role: UserRole, now: datetime,
+        actor: User | None = None,
     ) -> User:
+        if actor:
+            self._can_manage(actor, role)
         name = name.strip()
         email = email.strip().casefold()
         if not name:
             raise ValueError("Nome é obrigatório")
-        if len(password) < 12:
-            raise ValueError("A senha deve possuir ao menos 12 caracteres")
+        self._validate_password(password)
         async with self._uow_factory() as uow:
             if await uow.get_user_by_email(email):
                 raise ValueError("Já existe um Usuário com este e-mail")
@@ -85,3 +97,45 @@ class UserAdministrationService:
             )
             await uow.commit()
             return user
+
+    async def list_users(self, actor: User) -> list[User]:
+        async with self._uow_factory() as uow:
+            users = await uow.list_users()
+            if actor.role is UserRole.ADMINISTRATOR:
+                return [user for user in users if user.role is not UserRole.OWNER]
+            return users
+
+    async def update_user(
+        self, actor: User, user_id, role: UserRole, status: UserStatus, now: datetime
+    ) -> User:
+        async with self._uow_factory() as uow:
+            target = await uow.get_user(user_id, lock=True)
+            if not target:
+                raise EntityNotFound("Usuário não encontrado")
+            self._can_manage(actor, target.role)
+            self._can_manage(actor, role)
+            if actor.id == target.id and status is not UserStatus.ACTIVE:
+                raise ForbiddenAccess("Não é possível bloquear ou desativar o próprio acesso")
+            removing_active_owner = (
+                target.role is UserRole.OWNER
+                and target.status is UserStatus.ACTIVE
+                and (role is not UserRole.OWNER or status is not UserStatus.ACTIVE)
+            )
+            if removing_active_owner and await uow.count_active_owners() <= 1:
+                raise ValueError("A arena deve manter ao menos um Proprietário ativo")
+            updated = await uow.update_user(user_id, role, status, now)
+            if status is not UserStatus.ACTIVE:
+                await uow.revoke_user_accesses(user_id, now)
+            await uow.commit()
+            return updated
+
+    async def reset_password(self, actor: User, user_id, password: str, now: datetime) -> None:
+        self._validate_password(password)
+        async with self._uow_factory() as uow:
+            target = await uow.get_user(user_id, lock=True)
+            if not target:
+                raise EntityNotFound("Usuário não encontrado")
+            self._can_manage(actor, target.role)
+            await uow.update_user_password(user_id, self._password_hasher.hash(password), now)
+            await uow.revoke_user_accesses(user_id, now)
+            await uow.commit()

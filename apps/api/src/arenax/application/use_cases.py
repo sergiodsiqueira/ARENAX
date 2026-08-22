@@ -2,7 +2,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
-from arenax.domain.errors import EntityNotFound, SessionConflict
+from arenax.domain.errors import (
+    ClientInUse,
+    EntityNotFound,
+    InactiveSpace,
+    SessionConflict,
+    SpaceInUse,
+)
 from arenax.domain.moment import Moment
 from arenax.domain.session import Session
 
@@ -21,16 +27,18 @@ class SessionService:
 
     async def create(
         self,
-        responsible_person_id: UUID,
+        responsible_client_id: UUID,
         space_ids: tuple[UUID, ...],
         start: datetime,
         end: datetime,
         now: datetime,
     ) -> Session:
-        session = Session(responsible_person_id, space_ids, start, end)
+        session = Session(responsible_client_id, space_ids, start, end)
         session._record("SessionCreated", now)
         async with self._uow_factory() as uow:
             await uow.lock_spaces(space_ids)
+            if not await uow.spaces_are_active(space_ids):
+                raise InactiveSpace("Only active Spaces can be scheduled")
             if await uow.has_conflict(space_ids, start, end):
                 raise SessionConflict("One or more Spaces are unavailable in this period")
             await uow.add_session(session)
@@ -55,7 +63,7 @@ class SessionService:
         async with self._uow_factory() as uow:
             return await uow.list_sessions(start, end, space_id)
 
-    async def transition(self, session_id: UUID, action: str, now: datetime, new_end=None) -> Session:
+    async def transition(self, session_id: UUID, action: str, now: datetime, new_end=None) -> Session | None:
         async with self._uow_factory() as uow:
             session = await uow.get_session(session_id, lock=True)
             if not session:
@@ -63,10 +71,18 @@ class SessionService:
             await uow.lock_spaces(session.space_ids)
             if action == "start":
                 session.start(now)
+            elif action == "confirm":
+                session.confirm(now)
             elif action == "finish":
                 session.finish(now)
             elif action == "cancel":
+                if not await uow.session_has_associated_events(session.id):
+                    await uow.delete_session(session.id)
+                    await uow.commit()
+                    return None
                 session.cancel(now)
+            elif action == "no_show":
+                session.mark_no_show(now)
             elif action == "extend":
                 if new_end is None:
                     raise ValueError("new_end is required")
@@ -124,31 +140,117 @@ class ArenaInfrastructureService:
     def __init__(self, uow_factory):
         self._uow_factory = uow_factory
 
-    async def create_person(self, name: str) -> UUID:
+    async def create_client(self, name: str) -> UUID:
+        name = name.strip()
+        if not name:
+            raise ValueError("Nome do Cliente é obrigatório")
         async with self._uow_factory() as uow:
-            entity_id = await uow.add_person(name)
+            entity_id = await uow.add_client(name)
             await uow.commit()
             return entity_id
 
     async def create_space(self, name: str) -> UUID:
+        name = name.strip()
+        if not name:
+            raise ValueError("Nome do Espaço é obrigatório")
         async with self._uow_factory() as uow:
             entity_id = await uow.add_space(name)
             await uow.commit()
             return entity_id
 
+    async def update_space(self, space_id: UUID, name: str, administrative_status: str) -> dict:
+        name = name.strip()
+        if not name:
+            raise ValueError("Nome do Espaço é obrigatório")
+        if administrative_status not in {"active", "maintenance", "disabled"}:
+            raise ValueError("Estado administrativo do Espaço é inválido")
+        async with self._uow_factory() as uow:
+            if not await uow.get_space(space_id, lock=True):
+                raise EntityNotFound("Espaço não encontrado")
+            space = await uow.update_space(space_id, name, administrative_status)
+            await uow.commit()
+            return space
+
+    async def delete_space(self, space_id: UUID) -> None:
+        async with self._uow_factory() as uow:
+            if not await uow.get_space(space_id, lock=True):
+                raise EntityNotFound("Espaço não encontrado")
+            if await uow.space_has_dependencies(space_id):
+                raise SpaceInUse("Espaço possui Sessões ou Equipamentos vinculados")
+            await uow.delete_space(space_id)
+            await uow.commit()
+
     async def create_equipment(
         self, space_id: UUID, kind: str, external_id: str, configuration: dict
     ) -> UUID:
-        if kind not in {"camera", "ax_device"}:
-            raise ValueError("Equipment kind must be camera or ax_device")
+        external_id = self._validate_equipment(kind, external_id, configuration)
         async with self._uow_factory() as uow:
+            if not await uow.get_space(space_id):
+                raise EntityNotFound("Espaço não encontrado")
             entity_id = await uow.add_equipment(space_id, kind, external_id, configuration)
             await uow.commit()
             return entity_id
 
-    async def list_people(self) -> list[dict]:
+    async def update_equipment(
+        self, equipment_id: UUID, space_id: UUID, kind: str, external_id: str, configuration: dict, administrative_status: str = "active"
+    ) -> dict:
+        external_id = self._validate_equipment(kind, external_id, configuration)
+        self._validate_binary_status(administrative_status, "Equipamento")
         async with self._uow_factory() as uow:
-            return await uow.list_people()
+            if not await uow.get_equipment(equipment_id, lock=True):
+                raise EntityNotFound("Equipamento não encontrado")
+            if not await uow.get_space(space_id):
+                raise EntityNotFound("Espaço não encontrado")
+            equipment = await uow.update_equipment(
+                equipment_id, space_id, kind, external_id, configuration, administrative_status
+            )
+            await uow.commit()
+            return equipment
+
+    async def delete_equipment(self, equipment_id: UUID) -> None:
+        async with self._uow_factory() as uow:
+            if not await uow.get_equipment(equipment_id, lock=True):
+                raise EntityNotFound("Equipamento não encontrado")
+            await uow.delete_equipment(equipment_id)
+            await uow.commit()
+
+    @staticmethod
+    def _validate_equipment(kind: str, external_id: str, configuration: dict) -> str:
+        if kind not in {"camera", "ax_device"}:
+            raise ValueError("Tipo do Equipamento deve ser camera ou ax_device")
+        external_id = external_id.strip()
+        if not external_id:
+            raise ValueError("Identificador externo do Equipamento é obrigatório")
+        if not isinstance(configuration, dict):
+            raise ValueError("Configuração do Equipamento deve ser um objeto")
+        if kind == "camera" and not str(configuration.get("capture_url", "")).strip():
+            raise ValueError("URL de captura da Câmera é obrigatória")
+        return external_id
+
+    async def list_clients(self) -> list[dict]:
+        async with self._uow_factory() as uow:
+            return await uow.list_clients()
+
+    async def update_client(self, client_id: UUID, name: str, administrative_status: str = "active") -> dict:
+        name = name.strip()
+        if not name:
+            raise ValueError("Nome do Cliente é obrigatório")
+        self._validate_binary_status(administrative_status, "Cliente")
+        async with self._uow_factory() as uow:
+            if not await uow.get_client(client_id, lock=True):
+                raise EntityNotFound("Cliente não encontrado")
+            client = await uow.update_client(client_id, name, administrative_status)
+            await uow.commit()
+            return client
+
+    async def delete_client(self, client_id: UUID) -> None:
+        async with self._uow_factory() as uow:
+            if not await uow.get_client(client_id, lock=True):
+                raise EntityNotFound("Cliente não encontrado")
+            if await uow.client_has_sessions(client_id):
+                raise ClientInUse("Cliente é Responsável por uma ou mais Sessões")
+            await uow.delete_client(client_id)
+            await uow.commit()
 
     async def list_spaces(self) -> list[dict]:
         async with self._uow_factory() as uow:
@@ -157,3 +259,8 @@ class ArenaInfrastructureService:
     async def list_equipments(self, space_id: UUID | None = None) -> list[dict]:
         async with self._uow_factory() as uow:
             return await uow.list_equipments(space_id)
+
+    @staticmethod
+    def _validate_binary_status(status: str, entity: str) -> None:
+        if status not in {"active", "inactive"}:
+            raise ValueError(f"Estado administrativo do {entity} é inválido")

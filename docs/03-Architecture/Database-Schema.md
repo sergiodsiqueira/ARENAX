@@ -6,7 +6,7 @@ permanecer em inglês enquanto os contratos existentes estiverem em vigor.
 
 | Tabela | Finalidade |
 |---|---|
-| `pessoas` | Cadastro de Pessoas que podem ser Responsáveis. |
+| `clientes` | Cadastro de Clientes que podem ser Responsáveis. |
 | `espacos` | Recursos físicos da Arena. |
 | `equipamentos` | Câmeras e AX Devices associados a Espaços. |
 | `sessoes` | Agregado central da operação. |
@@ -22,7 +22,8 @@ permanecer em inglês enquanto os contratos existentes estiverem em vigor.
 
 - `sessoes`: `responsavel_id`, `inicio_previsto`, `fim_previsto`, `inicio_real`, `fim_real`.
 - `espacos`: `nome`, `status_administrativo`.
-- `equipamentos`: `espaco_id`, `tipo`, `identificador_externo`, `configuracao`.
+- `clientes`: `nome`, `status_administrativo`.
+- `equipamentos`: `espaco_id`, `tipo`, `identificador_externo`, `configuracao`, `status_administrativo`.
 - `momentos`: `sessao_id`, `espaco_id`, `ocorrido_em`, `caminho_replay`.
 - `eventos_fisicos`: `dispositivo_id`, `ocorrido_em`, `chave_idempotencia`, `aceito`.
 - `linha_do_tempo`: `sessao_id`, `tipo`, `ocorrido_em`, `dados`.

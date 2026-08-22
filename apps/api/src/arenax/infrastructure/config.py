@@ -8,6 +8,10 @@ class Settings(BaseSettings):
     access_cookie_secure: bool = False
     access_duration_hours: int = 12
     persistent_access_duration_days: int = 30
+    media_root: str = "/media"
+    mediamtx_api_url: str = "http://localhost:9997"
+    mediamtx_public_webrtc_url: str = "http://localhost:8889"
+    live_path_secret: str = "change-me-in-production"
     model_config = SettingsConfigDict(env_prefix="ARENAX_", env_file=".env")
 
 

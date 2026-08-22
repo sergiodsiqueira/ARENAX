@@ -52,7 +52,7 @@ $sourcePath = Join-Path $repositoryRoot "media\$sourceName"
 $replayPath = $null
 $bufferDirectory = $null
 $healthPath = $null
-$person = $null
+$client = $null
 $space = $null
 $camera = $null
 $session = $null
@@ -105,7 +105,7 @@ try {
     & $docker compose exec -T replay-worker sh -c $ffmpegCommand
     if ($LASTEXITCODE -ne 0) { throw "Synthetic video generation failed." }
 
-    $person = Invoke-ArenaxApi -Method Post -Path "/people" -Body @{
+    $client = Invoke-ArenaxApi -Method Post -Path "/clients" -Body @{
         name = "Smoke Test Person $runId"
     }
     $space = Invoke-ArenaxApi -Method Post -Path "/spaces" -Body @{
@@ -130,7 +130,7 @@ try {
 
     $now = [DateTimeOffset]::UtcNow
     $session = Invoke-ArenaxApi -Method Post -Path "/sessions" -Body @{
-        responsible_person_id = $person.id
+        responsible_client_id = $client.id
         space_ids             = @($space.id)
         scheduled_start       = $now.AddMinutes(-5).ToString("o")
         scheduled_end         = $now.AddMinutes(55).ToString("o")
@@ -192,7 +192,7 @@ try {
 }
 finally {
     Remove-Item Env:ARENAX_INITIAL_USER_PASSWORD -ErrorAction SilentlyContinue
-    if ($session -and $event -and $space -and $person) {
+    if ($session -and $event -and $space -and $client) {
         $cleanupSql = @"
 DELETE FROM caixa_de_saida WHERE agregado_id = '$($event.moment_id)';
 DELETE FROM linha_do_tempo WHERE sessao_id = '$($session.id)';
@@ -202,7 +202,7 @@ DELETE FROM sessao_espacos WHERE sessao_id = '$($session.id)';
 DELETE FROM sessoes WHERE id = '$($session.id)';
 DELETE FROM equipamentos WHERE espaco_id = '$($space.id)';
 DELETE FROM espacos WHERE id = '$($space.id)';
-DELETE FROM pessoas WHERE id = '$($person.id)';
+DELETE FROM clientes WHERE id = '$($client.id)';
 "@
         & $docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U arenax -d arenax -c $cleanupSql | Out-Null
         Start-Sleep -Seconds 6

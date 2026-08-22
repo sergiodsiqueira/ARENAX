@@ -1,12 +1,14 @@
+import json
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 
-from arenax.application.auth import AuthenticationService
+from arenax.application.auth import AuthenticationService, UserAdministrationService
 from arenax.application.use_cases import (
     ArenaInfrastructureService,
     PhysicalEventService,
@@ -19,8 +21,9 @@ from arenax.domain.errors import (
     InvalidAccess,
     InvalidCredentials,
 )
-from arenax.domain.identity import User, UserRole
+from arenax.domain.identity import User, UserRole, UserStatus
 from arenax.infrastructure.config import settings
+from arenax.infrastructure.live_gateway import LiveGatewayUnavailable, MediaMtxGateway
 from arenax.infrastructure.security import (
     Argon2PasswordHasher,
     hash_access_token,
@@ -29,10 +32,15 @@ from arenax.infrastructure.security import (
 from arenax.infrastructure.uow import SqlAlchemyUnitOfWork
 
 from .schemas import (
+    AdminUserResponse,
     ButtonPressedRequest,
     ButtonPressedResponse,
+    CameraHealthResponse,
+    CameraLiveResponse,
+    ClientResponse,
     CreatedResourceResponse,
     CreateSessionRequest,
+    CreateUserRequest,
     EquipmentRequest,
     EquipmentResponse,
     ExtendSessionRequest,
@@ -40,8 +48,12 @@ from .schemas import (
     LoginResponse,
     NamedResourceRequest,
     NamedResourceResponse,
+    ResetUserPasswordRequest,
     SessionResponse,
     SpaceResponse,
+    UpdateUserRequest,
+    UpdateSpaceRequest,
+    UpdateClientRequest,
     UserResponse,
 )
 
@@ -59,6 +71,12 @@ infrastructure = ArenaInfrastructureService(SqlAlchemyUnitOfWork)
 password_hasher = Argon2PasswordHasher()
 authentication = AuthenticationService(
     SqlAlchemyUnitOfWork, password_hasher, issue_access_token, hash_access_token
+)
+user_administration = UserAdministrationService(SqlAlchemyUnitOfWork, password_hasher)
+live_gateway = MediaMtxGateway(
+    settings.mediamtx_api_url,
+    settings.mediamtx_public_webrtc_url,
+    settings.live_path_secret,
 )
 
 
@@ -87,6 +105,14 @@ async def health():
 
 def user_response(user) -> UserResponse:
     return UserResponse(id=user.id, name=user.name, email=user.email, role=user.role.value)
+
+
+def admin_user_response(user) -> AdminUserResponse:
+    return AdminUserResponse(
+        id=user.id, name=user.name, email=user.email, role=user.role.value,
+        status=user.status.value, created_at=user.created_at, updated_at=user.updated_at,
+        last_access_at=user.last_access_at,
+    )
 
 
 @app.post("/api/v1/auth/login", response_model=LoginResponse)
@@ -154,16 +180,64 @@ async def logout(request: Request, response: Response):
     response.headers["Cache-Control"] = "no-store"
 
 
-@app.post("/api/v1/people", response_model=CreatedResourceResponse, status_code=201)
-async def create_person(
-    request: NamedResourceRequest, _user: AdministratorUser
+@app.get("/api/v1/users", response_model=list[AdminUserResponse])
+async def list_users(user: AdministratorUser):
+    return [admin_user_response(item) for item in await user_administration.list_users(user)]
+
+
+@app.post("/api/v1/users", response_model=AdminUserResponse, status_code=201)
+async def create_user(request: CreateUserRequest, user: AdministratorUser):
+    created = await user_administration.create_user(
+        request.name, request.email, request.password, UserRole(request.role), datetime.now(UTC), user
+    )
+    return admin_user_response(created)
+
+
+@app.put("/api/v1/users/{user_id}", response_model=AdminUserResponse)
+async def update_user(user_id: UUID, request: UpdateUserRequest, user: AdministratorUser):
+    updated = await user_administration.update_user(
+        user, user_id, UserRole(request.role), UserStatus(request.status), datetime.now(UTC)
+    )
+    return admin_user_response(updated)
+
+
+@app.post("/api/v1/users/{user_id}/reset-password", status_code=204)
+async def reset_user_password(
+    user_id: UUID, request: ResetUserPasswordRequest, user: AdministratorUser
 ):
-    return {"id": await infrastructure.create_person(request.name)}
+    await user_administration.reset_password(user, user_id, request.password, datetime.now(UTC))
 
 
-@app.get("/api/v1/people", response_model=list[NamedResourceResponse])
-async def list_people(_user: AuthenticatedUser):
-    return await infrastructure.list_people()
+@app.post("/api/v1/clients", response_model=CreatedResourceResponse, status_code=201)
+async def create_client(
+    request: NamedResourceRequest, _user: AuthenticatedUser
+):
+    return {"id": await infrastructure.create_client(request.name)}
+
+
+@app.get("/api/v1/clients", response_model=list[ClientResponse])
+async def list_clients(_user: AuthenticatedUser):
+    return await infrastructure.list_clients()
+
+
+@app.put("/api/v1/clients/{client_id}", response_model=ClientResponse)
+async def update_client(client_id: UUID, request: UpdateClientRequest, _user: AuthenticatedUser):
+    return await infrastructure.update_client(client_id, request.name, request.administrative_status)
+
+
+@app.delete("/api/v1/clients/{client_id}", status_code=204)
+async def delete_client(client_id: UUID, _user: AuthenticatedUser):
+    await infrastructure.delete_client(client_id)
+
+
+@app.post("/api/v1/people", response_model=CreatedResourceResponse, status_code=201, deprecated=True)
+async def create_person_compatibility(request: NamedResourceRequest, _user: AuthenticatedUser):
+    return {"id": await infrastructure.create_client(request.name)}
+
+
+@app.get("/api/v1/people", response_model=list[NamedResourceResponse], deprecated=True)
+async def list_people_compatibility(_user: AuthenticatedUser):
+    return await infrastructure.list_clients()
 
 
 @app.post("/api/v1/spaces", response_model=CreatedResourceResponse, status_code=201)
@@ -176,6 +250,16 @@ async def create_space(
 @app.get("/api/v1/spaces", response_model=list[SpaceResponse])
 async def list_spaces(_user: AuthenticatedUser):
     return await infrastructure.list_spaces()
+
+
+@app.put("/api/v1/spaces/{space_id}", response_model=SpaceResponse)
+async def update_space(space_id: UUID, request: UpdateSpaceRequest, _user: AdministratorUser):
+    return await infrastructure.update_space(space_id, request.name, request.administrative_status)
+
+
+@app.delete("/api/v1/spaces/{space_id}", status_code=204)
+async def delete_space(space_id: UUID, _user: AdministratorUser):
+    await infrastructure.delete_space(space_id)
 
 
 @app.post("/api/v1/equipments", response_model=CreatedResourceResponse, status_code=201)
@@ -198,12 +282,88 @@ async def list_equipments(
     return await infrastructure.list_equipments(space_id)
 
 
+@app.put("/api/v1/equipments/{equipment_id}", response_model=EquipmentResponse)
+async def update_equipment(
+    equipment_id: UUID, request: EquipmentRequest, _user: AdministratorUser
+):
+    return await infrastructure.update_equipment(
+        equipment_id,
+        request.space_id,
+        request.kind,
+        request.external_id,
+        request.configuration,
+        request.administrative_status,
+    )
+
+
+@app.delete("/api/v1/equipments/{equipment_id}", status_code=204)
+async def delete_equipment(equipment_id: UUID, _user: AdministratorUser):
+    async with SqlAlchemyUnitOfWork() as uow:
+        equipment = await uow.get_equipment(equipment_id)
+    await infrastructure.delete_equipment(equipment_id)
+    if equipment and equipment["kind"] == "camera":
+        try:
+            await live_gateway.remove_camera(equipment_id)
+        except LiveGatewayUnavailable:
+            pass
+
+
+@app.get("/api/v1/cameras/{camera_id}/health", response_model=CameraHealthResponse)
+async def camera_health(camera_id: UUID, _user: AdministratorUser):
+    health_path = Path(settings.media_root) / "capture-health" / f"{camera_id}.json"
+    if not health_path.is_file():
+        return CameraHealthResponse(camera_id=camera_id, status="waiting")
+    try:
+        data = json.loads(health_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise HTTPException(503, "Camera health is temporarily unavailable") from exc
+    return CameraHealthResponse(
+        camera_id=camera_id,
+        status=data.get("status", "unknown"),
+        checked_at=data.get("checkedAt"),
+        error=data.get("error"),
+    )
+
+
+@app.post("/api/v1/cameras/{camera_id}/live", response_model=CameraLiveResponse)
+async def camera_live(camera_id: UUID, _user: AdministratorUser):
+    async with SqlAlchemyUnitOfWork() as uow:
+        equipment = await uow.get_equipment(camera_id)
+    if not equipment or equipment["kind"] != "camera":
+        raise EntityNotFound("Câmera não encontrada")
+    capture_url = str(equipment["configuration"].get("capture_url", "")).strip()
+    if not capture_url.lower().startswith(("rtsp://", "rtsps://")):
+        raise ValueError("A Câmera não possui uma URL RTSP válida")
+    try:
+        url = await live_gateway.ensure_camera(
+            camera_id,
+            capture_url,
+            str(equipment["configuration"].get("rtsp_transport", "automatic")),
+        )
+    except LiveGatewayUnavailable as exc:
+        raise HTTPException(503, "Visualização ao vivo temporariamente indisponível") from exc
+    return CameraLiveResponse(url=url)
+
+
+@app.get("/api/v1/moments/{moment_id}/replay")
+async def get_moment_replay(moment_id: UUID, _user: AuthenticatedUser):
+    async with SqlAlchemyUnitOfWork() as uow:
+        replay_path = await uow.get_moment_replay_path(moment_id)
+    if not replay_path:
+        raise HTTPException(404, "Replay not found")
+    media_root = Path(settings.media_root).resolve()
+    path = Path(replay_path).resolve()
+    if media_root not in path.parents or not path.is_file():
+        raise HTTPException(404, "Replay file not found")
+    return FileResponse(path, media_type="video/mp4", filename=f"{moment_id}.mp4")
+
+
 @app.post("/api/v1/sessions", response_model=SessionResponse, status_code=201)
 async def create_session(
     request: CreateSessionRequest, _user: AuthenticatedUser
 ):
     try:
-        return await sessions.create(request.responsible_person_id, tuple(request.space_ids),
+        return await sessions.create(request.responsible_client_id, tuple(request.space_ids),
             request.scheduled_start, request.scheduled_end, datetime.now(UTC))
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
@@ -226,13 +386,16 @@ async def get_session_dossier(
     return await sessions.dossier(session_id)
 
 
-@app.post("/api/v1/sessions/{session_id}/actions/{action}", response_model=SessionResponse)
+@app.post("/api/v1/sessions/{session_id}/actions/{action}", response_model=SessionResponse | None)
 async def transition_session(
     session_id: UUID, action: str, _user: AuthenticatedUser
 ):
-    if action not in {"start", "finish", "cancel"}:
+    if action not in {"confirm", "start", "finish", "cancel", "no_show"}:
         raise HTTPException(404, "Unknown action")
-    return await sessions.transition(session_id, action, datetime.now(UTC))
+    result = await sessions.transition(session_id, action, datetime.now(UTC))
+    if result is None:
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return result
 
 
 @app.post("/api/v1/sessions/{session_id}/extend", response_model=SessionResponse)

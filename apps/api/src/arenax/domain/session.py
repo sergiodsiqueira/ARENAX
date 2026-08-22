@@ -34,7 +34,7 @@ class DomainEvent:
 
 @dataclass(slots=True)
 class Session:
-    responsible_person_id: UUID
+    responsible_client_id: UUID
     space_ids: tuple[UUID, ...]
     scheduled_start: datetime
     scheduled_end: datetime
@@ -91,6 +91,14 @@ class Session:
         if self.actual_start:
             self.actual_end = now
 
+    def mark_no_show(self, now: datetime) -> None:
+        self._transition(
+            {SessionStatus.SCHEDULED, SessionStatus.CONFIRMED},
+            SessionStatus.NO_SHOW,
+            "SessionMarkedNoShow",
+            now,
+        )
+
     def _transition(
         self, allowed: set[SessionStatus], target: SessionStatus, event: str, now: datetime
     ) -> None:
@@ -112,4 +120,3 @@ class Session:
 def periods_overlap(start_a: datetime, end_a: datetime, start_b: datetime, end_b: datetime) -> bool:
     """Return overlap for half-open intervals [start, end)."""
     return start_a < end_b and start_b < end_a
-

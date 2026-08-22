@@ -1,7 +1,7 @@
 # Sprint 1 — Especificação técnica executável
 
 ## Escopo
-Vertical slice: cadastrar Pessoa, Espaço, Câmera e AX Device; criar/iniciar Sessão;
+Vertical slice: cadastrar Cliente, Espaço, Câmera e AX Device; criar/iniciar Sessão;
 receber acionamento idempotente; localizar Sessão ativa; criar Momento e outbox;
 gerar Replay; atualizar Timeline.
 

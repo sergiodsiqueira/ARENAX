@@ -21,9 +21,11 @@ escreve o estado técnico em `/media/capture-health/<camera-id>.json`.
 Para servidores RTSP sem suporte a transporte intercalado, a Câmera pode definir
 `configuration.rtsp_transport` como `udp` ou `udp_multicast`; o padrão é `tcp`.
 
-O ambiente local inclui MediaMTX como ponto RTSP. Publicadores enviam para
-`rtsp://localhost:8554/<path>` e o Capture Service lê pelo endereço interno
-`rtsp://mediamtx:8554/<path>`, evitando dependência do transporte UDP do host.
+O Capture Service consome diretamente a URL RTSP configurada. Como navegadores não
+reproduzem RTSP nativamente, a API registra essa mesma fonte sob demanda no MediaMTX
+e entrega ao frontend somente um canal WebRTC opaco. A fonte é encerrada após o
+período sem leitores e suas credenciais não são enviadas ao navegador. Essa rota de
+visualização não participa da geração de Replay.
 
 O Replay Worker seleciona os segmentos que intersectam a janela do Momento. A
 configuração legada `source_path` permanece temporariamente aceita como fallback.

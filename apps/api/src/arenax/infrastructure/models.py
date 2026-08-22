@@ -18,10 +18,11 @@ class Base(DeclarativeBase):
     pass
 
 
-class PersonModel(Base):
-    __tablename__ = "pessoas"
+class ClientModel(Base):
+    __tablename__ = "clientes"
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column("nome", String(160))
+    administrative_status: Mapped[str] = mapped_column("status_administrativo", String(20), default="active")
 
 
 class SpaceModel(Base):
@@ -40,13 +41,14 @@ class EquipmentModel(Base):
     kind: Mapped[str] = mapped_column("tipo", String(30))
     external_id: Mapped[str] = mapped_column("identificador_externo", String(100), unique=True)
     configuration: Mapped[dict] = mapped_column("configuracao", JSON, default=dict)
+    administrative_status: Mapped[str] = mapped_column("status_administrativo", String(20), default="active")
 
 
 class SessionModel(Base):
     __tablename__ = "sessoes"
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True)
-    responsible_person_id: Mapped[UUID] = mapped_column(
-        "responsavel_id", ForeignKey("pessoas.id")
+    responsible_client_id: Mapped[UUID] = mapped_column(
+        "responsavel_id", ForeignKey("clientes.id")
     )
     status: Mapped[str] = mapped_column(String(30), index=True)
     scheduled_start: Mapped[datetime] = mapped_column(

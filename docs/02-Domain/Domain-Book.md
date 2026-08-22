@@ -4,7 +4,7 @@
 O Core Domain é a **operação de uma Arena através de Sessões realizadas em Espaços**.
 
 ## Sessão
-A Sessão representa a utilização de um ou mais Espaços em determinado período e centraliza Responsável, Pessoas relacionadas, Espaços, período previsto/real, Pagamentos, Momentos, Replays, Compartilhamentos, Eventos, Ocorrências, Timeline e Auditoria.
+A Sessão representa a utilização de um ou mais Espaços em determinado período e centraliza Responsável, Cliente, Espaços, período previsto/real, Pagamentos, Momentos, Replays, Compartilhamentos, Eventos, Ocorrências, Timeline e Auditoria.
 
 ### Estados
 Rascunho; Agendada; Confirmada; Em andamento; Finalizada; Arquivada; Cancelada; Não compareceu.
@@ -25,8 +25,8 @@ Qualquer recurso físico da Arena que participe de uma Sessão: Society, Beach T
 ## Momento e Replay
 O acionamento físico solicita um **Momento**. Replay é o conteúdo de vídeo produzido para esse Momento. No futuro, um Momento pode representar gol, defesa, ponto ou outro evento.
 
-## Pessoa / Responsável
-Pessoa é o cadastro básico. Em uma Sessão, pode exercer o papel de Responsável. Participantes detalhados ficam fora do MVP.
+## Cliente / Responsável
+Cliente é o cadastro de uma pessoa atendida pela Arena. Em uma Sessão, exerce o papel de Responsável. Participantes detalhados ficam fora do MVP.
 
 ## Equipamento
 Hardware físico. Tipos iniciais: Câmera IP e AX Device. Futuramente: placar, iluminação, catraca e sensores.

@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import or_, select
+from sqlalchemy import delete, func, or_, select, update
 
 from arenax.domain.identity import User, UserRole, UserStatus
 from arenax.domain.moment import Moment
@@ -13,7 +13,7 @@ from .models import (
     EquipmentModel,
     MomentModel,
     OutboxModel,
-    PersonModel,
+    ClientModel,
     PhysicalEventModel,
     SessionModel,
     SessionSpaceModel,
@@ -42,6 +42,15 @@ class SqlAlchemyUnitOfWork:
         ))
         if len(rows) != len(space_ids):
             raise ValueError("One or more Spaces do not exist")
+
+    async def spaces_are_active(self, space_ids: tuple[UUID, ...]) -> bool:
+        active_count = await self.session.scalar(
+            select(func.count()).select_from(SpaceModel).where(
+                SpaceModel.id.in_(space_ids),
+                SpaceModel.administrative_status == "active",
+            )
+        )
+        return active_count == len(space_ids)
 
     async def has_conflict(self, space_ids, start, end, exclude=None) -> bool:
         query = select(SessionModel.id).join(SessionSpaceModel).where(
@@ -73,6 +82,31 @@ class SqlAlchemyUnitOfWork:
         model = await self.session.get(SessionModel, domain.id)
         model.status, model.scheduled_end = domain.status.value, domain.scheduled_end
         model.actual_start, model.actual_end = domain.actual_start, domain.actual_end
+
+    async def session_has_associated_events(self, session_id: UUID) -> bool:
+        timeline_event = await self.session.scalar(
+            select(TimelineModel.id).where(
+                TimelineModel.session_id == session_id,
+                TimelineModel.kind != "SessionCreated",
+            ).limit(1)
+        )
+        if timeline_event is not None:
+            return True
+        moment = await self.session.scalar(
+            select(MomentModel.id).where(MomentModel.session_id == session_id).limit(1)
+        )
+        return moment is not None
+
+    async def delete_session(self, session_id: UUID) -> None:
+        await self.session.execute(
+            delete(TimelineModel).where(TimelineModel.session_id == session_id)
+        )
+        await self.session.execute(
+            delete(SessionSpaceModel).where(SessionSpaceModel.session_id == session_id)
+        )
+        model = await self.session.get(SessionModel, session_id)
+        if model is not None:
+            await self.session.delete(model)
 
     async def resolve_device_space(self, device_id: str) -> UUID | None:
         return await self.session.scalar(select(EquipmentModel.space_id).where(
@@ -116,8 +150,8 @@ class SqlAlchemyUnitOfWork:
     async def commit(self) -> None:
         await self.session.commit()
 
-    async def add_person(self, name: str) -> UUID:
-        model = PersonModel(name=name)
+    async def add_client(self, name: str) -> UUID:
+        model = ClientModel(name=name)
         self.session.add(model)
         await self.session.flush()
         return model.id
@@ -128,6 +162,26 @@ class SqlAlchemyUnitOfWork:
         await self.session.flush()
         return model.id
 
+    async def get_space(self, space_id: UUID, *, lock: bool = False) -> dict | None:
+        query = select(SpaceModel).where(SpaceModel.id == space_id)
+        model = await self.session.scalar(query.with_for_update() if lock else query)
+        return {"id": model.id, "name": model.name, "administrative_status": model.administrative_status} if model else None
+
+    async def update_space(self, space_id: UUID, name: str, administrative_status: str) -> dict:
+        model = await self.session.get(SpaceModel, space_id)
+        model.name, model.administrative_status = name, administrative_status
+        await self.session.flush()
+        return {"id": model.id, "name": model.name, "administrative_status": model.administrative_status}
+
+    async def space_has_dependencies(self, space_id: UUID) -> bool:
+        session_exists = await self.session.scalar(select(SessionSpaceModel.session_id).where(SessionSpaceModel.space_id == space_id).limit(1))
+        equipment_exists = await self.session.scalar(select(EquipmentModel.id).where(EquipmentModel.space_id == space_id).limit(1))
+        return session_exists is not None or equipment_exists is not None
+
+    async def delete_space(self, space_id: UUID) -> None:
+        model = await self.session.get(SpaceModel, space_id)
+        await self.session.delete(model)
+
     async def add_equipment(self, space_id, kind, external_id, configuration) -> UUID:
         model = EquipmentModel(space_id=space_id, kind=kind, external_id=external_id,
                                configuration=configuration)
@@ -135,9 +189,51 @@ class SqlAlchemyUnitOfWork:
         await self.session.flush()
         return model.id
 
-    async def list_people(self) -> list[dict]:
-        models = list(await self.session.scalars(select(PersonModel).order_by(PersonModel.name)))
-        return [{"id": model.id, "name": model.name} for model in models]
+    async def get_equipment(self, equipment_id: UUID, *, lock: bool = False) -> dict | None:
+        query = select(EquipmentModel).where(EquipmentModel.id == equipment_id)
+        model = await self.session.scalar(query.with_for_update() if lock else query)
+        return self._equipment_projection(model) if model else None
+
+    async def update_equipment(
+        self, equipment_id: UUID, space_id: UUID, kind: str, external_id: str, configuration: dict, administrative_status: str
+    ) -> dict:
+        model = await self.session.get(EquipmentModel, equipment_id)
+        model.space_id = space_id
+        model.kind = kind
+        model.external_id = external_id
+        model.configuration = configuration
+        model.administrative_status = administrative_status
+        await self.session.flush()
+        return self._equipment_projection(model)
+
+    async def delete_equipment(self, equipment_id: UUID) -> None:
+        model = await self.session.get(EquipmentModel, equipment_id)
+        await self.session.delete(model)
+
+    async def list_clients(self) -> list[dict]:
+        models = list(await self.session.scalars(select(ClientModel).order_by(ClientModel.name)))
+        return [{"id": model.id, "name": model.name, "administrative_status": model.administrative_status} for model in models]
+
+    async def get_client(self, client_id: UUID, *, lock: bool = False) -> dict | None:
+        query = select(ClientModel).where(ClientModel.id == client_id)
+        model = await self.session.scalar(query.with_for_update() if lock else query)
+        return {"id": model.id, "name": model.name, "administrative_status": model.administrative_status} if model else None
+
+    async def update_client(self, client_id: UUID, name: str, administrative_status: str) -> dict:
+        model = await self.session.get(ClientModel, client_id)
+        model.name = name
+        model.administrative_status = administrative_status
+        await self.session.flush()
+        return {"id": model.id, "name": model.name, "administrative_status": model.administrative_status}
+
+    async def client_has_sessions(self, client_id: UUID) -> bool:
+        return await self.session.scalar(
+            select(SessionModel.id).where(SessionModel.responsible_client_id == client_id).limit(1)
+        ) is not None
+
+    async def delete_client(self, client_id: UUID) -> None:
+        model = await self.session.get(ClientModel, client_id)
+        await self.session.delete(model)
 
     async def list_spaces(self) -> list[dict]:
         models = list(await self.session.scalars(select(SpaceModel).order_by(SpaceModel.name)))
@@ -155,16 +251,7 @@ class SqlAlchemyUnitOfWork:
         if space_id is not None:
             query = query.where(EquipmentModel.space_id == space_id)
         models = list(await self.session.scalars(query))
-        return [
-            {
-                "id": model.id,
-                "space_id": model.space_id,
-                "kind": model.kind,
-                "external_id": model.external_id,
-                "configuration": model.configuration,
-            }
-            for model in models
-        ]
+        return [self._equipment_projection(model) for model in models]
 
     async def session_dossier(self, session_id: UUID) -> dict | None:
         model = await self.session.get(SessionModel, session_id)
@@ -177,7 +264,7 @@ class SqlAlchemyUnitOfWork:
         timeline = list(await self.session.scalars(select(TimelineModel).where(
             TimelineModel.session_id == session_id).order_by(TimelineModel.occurred_at)))
         return {
-            "id": str(model.id), "responsible_person_id": str(model.responsible_person_id),
+            "id": str(model.id), "responsible_client_id": str(model.responsible_client_id),
             "space_ids": [str(item) for item in spaces], "status": model.status,
             "scheduled_start": model.scheduled_start, "scheduled_end": model.scheduled_end,
             "actual_start": model.actual_start, "actual_end": model.actual_end,
@@ -283,16 +370,49 @@ class SqlAlchemyUnitOfWork:
             user.last_access_at = now
             user.updated_at = now
 
+    async def list_users(self) -> list[User]:
+        models = list(await self.session.scalars(select(UserModel).order_by(UserModel.name, UserModel.id)))
+        return [self._user_to_domain(model) for model in models]
+
+    async def get_user(self, user_id: UUID, *, lock: bool = False) -> User | None:
+        query = select(UserModel).where(UserModel.id == user_id)
+        model = await self.session.scalar(query.with_for_update() if lock else query)
+        return self._user_to_domain(model) if model else None
+
+    async def update_user(self, user_id, role, status, now) -> User:
+        model = await self.session.get(UserModel, user_id)
+        model.role, model.status, model.updated_at = role.value, status.value, now
+        await self.session.flush()
+        return self._user_to_domain(model)
+
+    async def update_user_password(self, user_id, password_hash, now) -> None:
+        model = await self.session.get(UserModel, user_id)
+        model.password_hash, model.updated_at = password_hash, now
+
+    async def revoke_user_accesses(self, user_id, now) -> None:
+        await self.session.execute(update(AccessModel).where(
+            AccessModel.user_id == user_id, AccessModel.revoked_at.is_(None)
+        ).values(revoked_at=now))
+
+    async def count_active_owners(self) -> int:
+        return int(await self.session.scalar(select(func.count()).select_from(UserModel).where(
+            UserModel.role == UserRole.OWNER.value,
+            UserModel.status == UserStatus.ACTIVE.value,
+        )) or 0)
+
+    async def get_moment_replay_path(self, moment_id: UUID) -> str | None:
+        return await self.session.scalar(select(MomentModel.replay_path).where(MomentModel.id == moment_id))
+
     @staticmethod
     def _to_model(item: Session) -> SessionModel:
-        return SessionModel(id=item.id, responsible_person_id=item.responsible_person_id,
+        return SessionModel(id=item.id, responsible_client_id=item.responsible_client_id,
             status=item.status.value, scheduled_start=item.scheduled_start,
             scheduled_end=item.scheduled_end, actual_start=item.actual_start,
             actual_end=item.actual_end)
 
     @staticmethod
     def _to_domain(model: SessionModel, spaces: tuple[UUID, ...]) -> Session:
-        return Session(id=model.id, responsible_person_id=model.responsible_person_id,
+        return Session(id=model.id, responsible_client_id=model.responsible_client_id,
             space_ids=spaces, scheduled_start=model.scheduled_start,
             scheduled_end=model.scheduled_end, status=SessionStatus(model.status),
             actual_start=model.actual_start, actual_end=model.actual_end)
@@ -310,3 +430,14 @@ class SqlAlchemyUnitOfWork:
             updated_at=model.updated_at,
             last_access_at=model.last_access_at,
         )
+
+    @staticmethod
+    def _equipment_projection(model: EquipmentModel) -> dict:
+        return {
+            "id": model.id,
+            "space_id": model.space_id,
+            "kind": model.kind,
+            "external_id": model.external_id,
+            "configuration": model.configuration,
+            "administrative_status": model.administrative_status,
+        }

@@ -24,16 +24,16 @@ docker compose up --build
 ```
 
 A API fica em `http://localhost:8000`, com OpenAPI interativo em `/docs`. O fluxo
-inicial permite cadastrar Pessoa, Espaço, Câmera/AX Device, criar e iniciar uma
+inicial permite cadastrar Cliente, Espaço, Câmera/AX Device, criar e iniciar uma
 Sessão e publicar `POST /api/v1/events/button-pressed` com `Idempotency-Key`.
 
-Para uma Câmera do adapter de desenvolvimento, informe
-`configuration.capture_url` com uma URL RTSP ou arquivo visível em `/media`. O
+Para uma Câmera, informe `configuration.capture_url` com a URL RTSP de produção
+ou um arquivo visível em `/media`. O
 Capture Service mantém segmentos em `media/buffers/`, aplica retenção e publica
 saúde em `media/capture-health/`. Replays são gravados em `media/replays/`.
-O MediaMTX recebe publicações RTSP do host em `rtsp://localhost:8554/<path>`.
-Para publicar temporariamente a webcam do navegador, abra
-`http://localhost:8889/live/publish` e permita o acesso à câmera.
+Para exibição ao vivo, a API registra sob demanda a mesma fonte RTSP no MediaMTX e
+entrega ao navegador somente o canal WebRTC interno. Credenciais RTSP não são
+expostas ao frontend. O player fica em `http://localhost:8889` no ambiente local.
 
 Testes do backend:
 

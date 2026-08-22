@@ -10,6 +10,18 @@ class SessionConflict(DomainError):
     pass
 
 
+class InactiveSpace(DomainError):
+    """A Session cannot be scheduled in a Space that is not active."""
+
+
+class ClientInUse(DomainError):
+    """A Client referenced by a Session cannot be deleted."""
+
+
+class SpaceInUse(DomainError):
+    """A Space with Sessions or Equipment cannot be deleted."""
+
+
 class EntityNotFound(DomainError):
     pass
 

@@ -7,7 +7,7 @@ from arenax.application.use_cases import ArenaInfrastructureService
 
 class QueryUnitOfWork:
     def __init__(self):
-        self.people = [{"id": uuid4(), "name": "Ana"}]
+        self.clients = [{"id": uuid4(), "name": "Ana"}]
         self.spaces = [
             {"id": uuid4(), "name": "Society 01", "administrative_status": "active"}
         ]
@@ -28,8 +28,8 @@ class QueryUnitOfWork:
     async def __aexit__(self, *_):
         return None
 
-    async def list_people(self):
-        return self.people
+    async def list_clients(self):
+        return self.clients
 
     async def list_spaces(self):
         return self.spaces
@@ -44,7 +44,7 @@ async def test_administrative_queries_are_read_through_projections():
     uow = QueryUnitOfWork()
     service = ArenaInfrastructureService(lambda: uow)
 
-    assert await service.list_people() == uow.people
+    assert await service.list_clients() == uow.clients
     assert await service.list_spaces() == uow.spaces
     assert await service.list_equipments(uow.spaces[0]["id"]) == uow.equipments
     assert uow.equipment_filter == uow.spaces[0]["id"]

@@ -93,3 +93,18 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .primary-button:hover { background: #066442; box-shadow: 0 12px 30px rgba(8, 122, 84, .24); transform: translateY(-1px); }
 .primary-button:focus-visible { outline: 3px solid rgba(21, 150, 106, .28); outline-offset: 3px; }
 .primary-button:disabled { cursor: wait; opacity: .7; }
+
+.operation-button { display: inline-flex; align-items: center; gap: .4rem; border: 1px solid #cbd5e1; border-radius: .65rem; background: rgba(255,255,255,.85); padding: .55rem .75rem; color: #334155; font-size: .78rem; font-weight: 700; cursor: pointer; transition: 150ms; }
+.operation-button:hover { border-color: #94a3b8; background: white; transform: translateY(-1px); }
+.operation-button:disabled { cursor: wait; opacity: .55; transform: none; }
+.operation-button-primary { border-color: #087a54; background: #087a54; color: white; }
+.operation-button-primary:hover { border-color: #066442; background: #066442; }
+.operation-button-danger { border-color: transparent; background: transparent; color: #be123c; }
+.operation-button-danger:hover { border-color: #fecdd3; background: #fff1f2; }
+.admin-input { display: block; width: 100%; height: 46px; margin-top: .45rem; border: 1px solid #dbe1e8; border-radius: .7rem; background: white; padding: 0 .8rem; outline: none; color: #0f172a; font-weight: 400; }
+.admin-input:focus, .admin-select:focus { border-color: #15966a; box-shadow: 0 0 0 3px rgba(21,150,106,.11); }
+.admin-select { height: 38px; border: 1px solid #dbe1e8; border-radius: .6rem; background: white; padding: 0 .65rem; color: #334155; font-size: .82rem; outline: none; }
+.admin-select:disabled { cursor: not-allowed; opacity: .55; }
+.sidebar-link { display: flex; align-items: center; gap: .75rem; border-radius: .7rem; padding: .72rem .8rem; color: rgba(236,253,245,.68); font-size: .875rem; font-weight: 600; text-decoration: none; transition: 150ms; }
+.sidebar-link:hover { background: rgba(255,255,255,.08); color: white; }
+.sidebar-link-active { background: rgba(52,211,153,.14); color: #a7f3d0; box-shadow: inset 3px 0 #34d399; }

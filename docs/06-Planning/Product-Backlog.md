@@ -7,7 +7,7 @@
 | P0 | PostgreSQL/migrações | Persistência versionada. |
 | P0 | Sessão | Criar/consultar/iniciar/prorrogar/finalizar/cancelar. |
 | P0 | Conflitos | Impedir sobreposição de Espaços. |
-| P1 | Pessoas | Cadastro e Responsável. |
+| P1 | Clientes | Cadastro e Responsável. |
 | P1 | Espaços | CRUD incluindo DELETE controlado. |
 | P1 | Equipamentos | Câmeras/AX Devices incluindo DELETE controlado. |
 | P1 | Agenda | Sessões por data/Espaço. |

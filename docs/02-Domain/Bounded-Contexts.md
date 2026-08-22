@@ -12,7 +12,7 @@ Solicitação de Momento, captura de buffer, FFmpeg, Replay, biblioteca e compar
 ## Financeiro
 No MVP, pagamentos manuais associados à Sessão.
 
-## Pessoas
-Cadastro e consulta de Pessoas/Responsáveis.
+## Clientes
+Cadastro e consulta de Clientes/Responsáveis.
 
 > Bounded Context não implica microsserviço. O MVP será um **monólito modular**.

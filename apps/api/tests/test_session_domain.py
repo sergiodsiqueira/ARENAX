@@ -41,3 +41,11 @@ def test_only_in_progress_session_can_be_extended():
     with pytest.raises(InvalidSessionTransition):
         make_session().extend(NOW + timedelta(hours=2), NOW)
 
+
+def test_scheduled_session_can_be_confirmed_and_marked_no_show():
+    session = make_session()
+    session.confirm(NOW)
+    assert session.status is SessionStatus.CONFIRMED
+    session.mark_no_show(NOW)
+    assert session.status is SessionStatus.NO_SHOW
+    assert [event.name for event in session.events] == ["SessionConfirmed", "SessionMarkedNoShow"]
