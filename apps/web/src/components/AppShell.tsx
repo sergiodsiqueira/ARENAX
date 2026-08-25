@@ -24,36 +24,35 @@ export function AppShell({ user, children }: AppShellProps) {
   };
 
   const sidebar = <>
-    <div className="flex h-17 items-center justify-between border-b border-white/10 px-5">
+    <div className="flex min-h-44 items-center justify-between px-5">
       <NavLink className="flex items-center gap-3" to="/mission-control" onClick={() => setOpen(false)} aria-label="ARENAX">
-        <span className="logo-mark" aria-hidden="true"><span /></span>
-        <span className="text-lg font-extrabold tracking-[.22em]">ARENAX</span>
+        <span className="sidebar-logotype" role="img" aria-label="ARENAX Smart Arena Management" />
       </NavLink>
-      <button className="rounded-lg p-2 text-slate-300 hover:bg-white/10 lg:hidden" onClick={() => setOpen(false)} aria-label="Fechar menu"><X size={20} /></button>
+      <button className="rounded-lg p-2 text-muted-foreground hover:bg-accent lg:hidden" onClick={() => setOpen(false)} aria-label="Fechar menu"><X size={20} /></button>
     </div>
     <nav className="flex flex-1 flex-col p-4" aria-label="Navegação principal">
-      <p className="px-3 pb-2 pt-3 text-[.68rem] font-semibold tracking-[.16em] text-emerald-300/60 uppercase">Operação</p>
+      <p className="px-3 pb-2 pt-3 text-[.68rem] font-semibold tracking-[.16em] text-muted-foreground uppercase">Operação</p>
       <NavLink className={({ isActive }) => `sidebar-link ${isActive ? "sidebar-link-active" : ""}`} to="/mission-control" onClick={() => setOpen(false)}><LayoutDashboard size={19} /> Mission Control</NavLink>
       <NavLink className={({ isActive }) => `sidebar-link ${isActive ? "sidebar-link-active" : ""}`} to="/agenda" onClick={() => setOpen(false)}><CalendarDays size={19} /> Agenda</NavLink>
-      <p className="px-3 pb-2 pt-7 text-[.68rem] font-semibold tracking-[.16em] text-emerald-300/60 uppercase">Cadastros</p>
+      <p className="px-3 pb-2 pt-7 text-[.68rem] font-semibold tracking-[.16em] text-muted-foreground uppercase">Cadastros</p>
       <NavLink className={({ isActive }) => `sidebar-link ${isActive ? "sidebar-link-active" : ""}`} to="/cadastros/clientes" onClick={() => setOpen(false)}><Users size={19} /> Clientes</NavLink>
       <NavLink className={({ isActive }) => `sidebar-link ${isActive ? "sidebar-link-active" : ""}`} to="/cadastros/espacos" onClick={() => setOpen(false)}><MapPin size={19} /> Espaços</NavLink>
-      {user?.role !== "operador" && <><p className="px-3 pb-2 pt-7 text-[.68rem] font-semibold tracking-[.16em] text-emerald-300/60 uppercase">Administração</p><NavLink className={({ isActive }) => `sidebar-link ${isActive ? "sidebar-link-active" : ""}`} to="/administracao/equipamentos" onClick={() => setOpen(false)}><Cpu size={19} /> Equipamentos</NavLink><NavLink className={({ isActive }) => `sidebar-link ${isActive ? "sidebar-link-active" : ""}`} to="/administracao/acessos" onClick={() => setOpen(false)}><ShieldCheck size={19} /> Acessos</NavLink></>}
+      {user?.role !== "operador" && <><p className="px-3 pb-2 pt-7 text-[.68rem] font-semibold tracking-[.16em] text-muted-foreground uppercase">Administração</p><NavLink className={({ isActive }) => `sidebar-link ${isActive ? "sidebar-link-active" : ""}`} to="/administracao/equipamentos" onClick={() => setOpen(false)}><Cpu size={19} /> Equipamentos</NavLink><NavLink className={({ isActive }) => `sidebar-link ${isActive ? "sidebar-link-active" : ""}`} to="/administracao/acessos" onClick={() => setOpen(false)}><ShieldCheck size={19} /> Acessos</NavLink></>}
     </nav>
-    <div className="border-t border-white/10 p-4">
-      <div className="mb-3 px-3"><p className="truncate text-sm font-semibold text-white">{user?.name ?? "Carregando..."}</p><p className="mt-1 text-xs capitalize text-emerald-100/60">{user?.role}</p></div>
+    <div className="border-t border-border p-4">
+      <div className="mb-3 px-3"><p className="truncate text-sm font-semibold text-foreground">{user?.name ?? "Carregando..."}</p><p className="mt-1 text-xs capitalize text-muted-foreground">{user?.role}</p></div>
       <button className="sidebar-link w-full" onClick={leave}><LogOut size={18} /> Sair</button>
     </div>
   </>;
 
-  return <div className="min-h-screen bg-stone-50 text-slate-950">
-    <aside className="fixed inset-y-0 left-0 z-40 hidden w-66 flex-col bg-[#072e22] text-white lg:flex">{sidebar}</aside>
+  return <div className="min-h-screen bg-background text-foreground">
+    <aside className="fixed inset-y-0 left-0 z-40 hidden w-66 flex-col border-r border-border bg-card lg:flex">{sidebar}</aside>
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white/95 px-5 backdrop-blur lg:hidden">
       <button className="rounded-lg p-2 text-slate-600 hover:bg-slate-100" onClick={() => setOpen(true)} aria-label="Abrir menu" aria-expanded={open}><Menu size={22} /></button>
       <span className="text-base font-extrabold tracking-[.2em]">ARENAX</span>
       <span className="h-9 w-9 rounded-full bg-emerald-100 text-center text-sm font-bold leading-9 text-emerald-800">{user?.name?.charAt(0).toUpperCase() ?? "A"}</span>
     </header>
-    {open && <div className="fixed inset-0 z-50 lg:hidden"><button className="absolute inset-0 bg-slate-950/55" onClick={() => setOpen(false)} aria-label="Fechar menu" /><aside className="relative flex h-full w-[min(82vw,300px)] flex-col bg-[#072e22] text-white shadow-2xl">{sidebar}</aside></div>}
+    {open && <div className="fixed inset-0 z-50 lg:hidden"><button className="absolute inset-0 bg-slate-950/35" onClick={() => setOpen(false)} aria-label="Fechar menu" /><aside className="relative flex h-full w-[min(82vw,300px)] flex-col bg-card text-foreground shadow-2xl">{sidebar}</aside></div>}
     <div className="lg:pl-66">{children}</div>
   </div>;
 }

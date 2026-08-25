@@ -63,6 +63,10 @@ class SessionService:
         async with self._uow_factory() as uow:
             return await uow.list_sessions(start, end, space_id)
 
+    async def in_progress(self) -> list[Session]:
+        async with self._uow_factory() as uow:
+            return await uow.list_in_progress_sessions()
+
     async def transition(self, session_id: UUID, action: str, now: datetime, new_end=None) -> Session | None:
         async with self._uow_factory() as uow:
             session = await uow.get_session(session_id, lock=True)

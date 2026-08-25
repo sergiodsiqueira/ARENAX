@@ -1,29 +1,22 @@
 import { Check, CheckCheck, X } from "lucide-react";
+import { Button } from "./ui/button";
+import { cn } from "../lib/utils";
 
 export type StatusCounterKind = "active" | "inactive" | "all";
 
 const styles = {
   active: {
-    card: "border-emerald-100 bg-emerald-100/80",
-    circle: "bg-emerald-500",
-    selected: "border-emerald-500 ring-2 ring-emerald-500 ring-offset-2",
     icon: Check,
   },
   inactive: {
-    card: "border-rose-100 bg-rose-100/80",
-    circle: "bg-rose-500",
-    selected: "border-rose-500 ring-2 ring-rose-500 ring-offset-2",
     icon: X,
   },
   all: {
-    card: "border-blue-100 bg-blue-100/80",
-    circle: "bg-blue-500",
-    selected: "border-blue-500 ring-2 ring-blue-500 ring-offset-2",
     icon: CheckCheck,
   },
 } satisfies Record<
   StatusCounterKind,
-  { card: string; circle: string; selected: string; icon: typeof Check }
+  { icon: typeof Check }
 >;
 
 export function StatusCounterCard({
@@ -42,25 +35,32 @@ export function StatusCounterCard({
   const style = styles[kind];
   const Icon = style.icon;
   return (
-    <button
+    <Button
+      variant="outline"
       type="button"
       aria-pressed={selected}
       onClick={onClick}
-      className={`flex min-h-32 items-center justify-between rounded-2xl border p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none ${style.card} ${selected ? style.selected : "focus:ring-2 focus:ring-slate-400 focus:ring-offset-2"}`}
+      className={cn(
+        "h-auto min-h-24 w-full justify-start gap-4 rounded-2xl border-transparent px-4 py-3.5 text-left whitespace-normal shadow-none hover:-translate-y-0.5 hover:bg-secondary hover:shadow-sm",
+        selected ? "bg-secondary ring-1 ring-primary/5" : "bg-muted",
+      )}
     >
-      <span>
-        <span className="block text-sm font-medium text-slate-600">
+      <span
+        className={cn(
+          "grid size-13 shrink-0 place-items-center rounded-xl text-foreground",
+          selected ? "bg-card" : "bg-secondary",
+        )}
+      >
+        <Icon size={23} strokeWidth={1.8} aria-hidden="true" />
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate text-xs font-medium text-foreground">
           {label}
         </span>
-        <strong className="mt-2 block text-3xl font-semibold text-slate-950">
+        <strong className="mt-1 block text-2xl leading-none font-semibold text-primary">
           {value}
         </strong>
       </span>
-      <span
-        className={`grid h-14 w-14 shrink-0 place-items-center rounded-full text-white shadow-sm ${style.circle}`}
-      >
-        <Icon size={27} strokeWidth={2.5} aria-hidden="true" />
-      </span>
-    </button>
+    </Button>
   );
 }

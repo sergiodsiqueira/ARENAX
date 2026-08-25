@@ -7,15 +7,23 @@ import {
   Clock3,
   MapPin,
   Plus,
+  Radio,
   UserRound,
 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
+import { toast } from "sonner";
 import { AppShell } from "../components/AppShell";
+import { DatePicker } from "../components/ui/date-picker";
+import { ConfirmationAlertDialog } from "../components/ui/confirmation-alert-dialog";
+import { Combobox } from "../components/ui/combobox";
+import { Checkbox } from "../components/ui/checkbox";
+import { SessionSchedulePicker } from "../components/ui/session-schedule-picker";
 import {
   createSession,
   getClients,
   getCurrentUser,
+  getInProgressSessions,
   getSessions,
   getSpaces,
   transitionSession,
@@ -64,6 +72,14 @@ function initialPeriod() {
   return { start: dateTimeInput(start), end: dateTimeInput(end) };
 }
 
+function initialPeriodForDay(day: string) {
+  const period = initialPeriod();
+  return {
+    start: `${day}${period.start.slice(10)}`,
+    end: `${day}${period.end.slice(10)}`,
+  };
+}
+
 export function AgendaPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -72,7 +88,7 @@ export function AgendaPage() {
   const [responsibleId, setResponsibleId] = useState("");
   const [spaceIds, setSpaceIds] = useState<string[]>([]);
   const [period, setPeriod] = useState(initialPeriod);
-  const [feedback, setFeedback] = useState<string | null>(null);
+  const [view, setView] = useState<"day" | "in_progress">("day");
   const window = useMemo(() => dayWindow(day), [day]);
   const user = useQuery({
     queryKey: ["current-user"],
@@ -85,12 +101,33 @@ export function AgendaPage() {
     queryKey: ["agenda", day],
     queryFn: () => getSessions(window.start, window.end),
   });
+  const inProgressSessions = useQuery({
+    queryKey: ["agenda-in-progress"],
+    queryFn: getInProgressSessions,
+    enabled: view === "in_progress",
+  });
+  const selectedDate = useMemo(() => new Date(`${day}T12:00:00`), [day]);
+  const monthWindow = useMemo(() => {
+    const start = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+    const end = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 1);
+    return { start, end };
+  }, [selectedDate]);
+  const monthSessions = useQuery({
+    queryKey: ["agenda-month", selectedDate.getFullYear(), selectedDate.getMonth()],
+    queryFn: () => getSessions(monthWindow.start, monthWindow.end),
+  });
+  const markedDates = useMemo(
+    () => new Set((monthSessions.data ?? []).map((session) => dateInput(new Date(session.scheduled_start)))),
+    [monthSessions.data],
+  );
   useEffect(() => {
     if (user.isError) navigate("/login", { replace: true });
   }, [navigate, user.isError]);
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["agenda"] });
+    queryClient.invalidateQueries({ queryKey: ["agenda-in-progress"] });
+    queryClient.invalidateQueries({ queryKey: ["agenda-month"] });
     queryClient.invalidateQueries({ queryKey: ["sessions"] });
   };
   const create = useMutation({
@@ -106,11 +143,11 @@ export function AgendaPage() {
       setResponsibleId("");
       setSpaceIds([]);
       setPeriod(initialPeriod());
-      setFeedback("Sessão agendada com sucesso.");
+      toast.success("Sessão agendada com sucesso.");
       refresh();
     },
     onError: (error) =>
-      setFeedback(
+      toast.error(
         error instanceof Error
           ? error.message
           : "Não foi possível criar a Sessão.",
@@ -125,11 +162,11 @@ export function AgendaPage() {
       action: "confirm" | "start" | "cancel" | "no_show";
     }) => transitionSession(id, action),
     onSuccess: () => {
-      setFeedback("Sessão atualizada com sucesso.");
+      toast.success("Sessão atualizada com sucesso.");
       refresh();
     },
     onError: (error) =>
-      setFeedback(
+      toast.error(
         error instanceof Error
           ? error.message
           : "Não foi possível atualizar a Sessão.",
@@ -149,6 +186,10 @@ export function AgendaPage() {
     next.setDate(next.getDate() + amount);
     setDay(dateInput(next));
   };
+  const openCreateSession = () => {
+    setPeriod(initialPeriodForDay(day));
+    setCreating(true);
+  };
   const valid =
     responsibleId &&
     spaceIds.length > 0 &&
@@ -159,6 +200,7 @@ export function AgendaPage() {
     event.preventDefault();
     if (valid) create.mutate();
   };
+  const displayedSessions = view === "in_progress" ? inProgressSessions : sessions;
 
   return (
     <AppShell user={user.data}>
@@ -175,22 +217,23 @@ export function AgendaPage() {
               Planeje a utilização dos Espaços e acompanhe confirmações.
             </p>
           </div>
-          <button
-            className="operation-button operation-button-primary justify-center"
-            onClick={() => setCreating(true)}
-          >
-            <Plus size={17} /> Nova Sessão
-          </button>
-        </div>
-        {feedback && (
-          <div
-            className="mt-6 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm"
-            role="status"
-          >
-            {feedback}
+          <div className="flex flex-wrap gap-2">
+            <button
+              className={`operation-button justify-center ${view === "in_progress" ? "operation-button-primary" : ""}`}
+              aria-pressed={view === "in_progress"}
+              onClick={() => setView((current) => current === "in_progress" ? "day" : "in_progress")}
+            >
+              <Radio size={16} /> Em andamento
+            </button>
+            <button
+              className="operation-button operation-button-primary justify-center"
+              onClick={openCreateSession}
+            >
+              <Plus size={17} /> Nova Sessão
+            </button>
           </div>
-        )}
-        <section className="mt-7 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        </div>
+        {view === "day" ? <section className="mt-7 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center justify-between gap-2">
             <button
               className="rounded-lg p-2 hover:bg-slate-100"
@@ -199,15 +242,7 @@ export function AgendaPage() {
             >
               <ChevronLeft />
             </button>
-            <label className="flex items-center gap-2 font-semibold">
-              <CalendarDays className="text-emerald-700" size={19} />
-              <input
-                className="border-0 bg-transparent outline-none"
-                type="date"
-                value={day}
-                onChange={(event) => setDay(event.target.value)}
-              />
-            </label>
+            <DatePicker value={day} onChange={setDay} markedDates={markedDates} />
             <button
               className="rounded-lg p-2 hover:bg-slate-100"
               onClick={() => moveDay(1)}
@@ -222,38 +257,38 @@ export function AgendaPage() {
           >
             Hoje
           </button>
-        </section>
+        </section> : <section className="mt-7 flex items-center gap-3 rounded-2xl bg-secondary px-5 py-4 text-primary"><span className="grid size-9 place-items-center rounded-xl bg-card"><Radio size={18} /></span><div><p className="font-semibold">Sessões em andamento</p><p className="text-sm text-muted-foreground">Exibindo todas as Sessões atualmente em curso na Arena.</p></div></section>}
 
         <section className="mt-5 space-y-3">
-          {sessions.isLoading &&
+          {displayedSessions.isLoading &&
             [1, 2, 3].map((item) => (
               <div
                 key={item}
                 className="h-32 animate-pulse rounded-2xl border border-slate-200 bg-white"
               />
             ))}
-          {sessions.isError && (
+          {displayedSessions.isError && (
             <div className="rounded-2xl border border-rose-200 bg-white p-6 text-rose-800">
               Não foi possível carregar a Agenda.
             </div>
           )}
-          {!sessions.isLoading &&
-            !sessions.isError &&
-            !sessions.data?.length && (
+          {!displayedSessions.isLoading &&
+            !displayedSessions.isError &&
+            !displayedSessions.data?.length && (
               <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
                 <CalendarDays className="mx-auto text-slate-300" size={36} />
                 <p className="mt-3 font-semibold text-slate-600">
-                  Nenhuma Sessão neste dia
+                  {view === "in_progress" ? "Nenhuma Sessão em andamento" : "Nenhuma Sessão neste dia"}
                 </p>
-                <button
+                {view === "day" && <button
                   className="mt-4 text-sm font-semibold text-emerald-700"
-                  onClick={() => setCreating(true)}
+                  onClick={openCreateSession}
                 >
                   Agendar a primeira Sessão
-                </button>
+                </button>}
               </div>
             )}
-          {sessions.data?.map((session) => (
+          {displayedSessions.data?.map((session) => (
             <SessionCard
               key={session.id}
               session={session}
@@ -295,19 +330,13 @@ export function AgendaPage() {
               </div>
               <label className="mt-6 block text-sm font-semibold text-slate-600">
                 Cliente Responsável
-                <select
-                  className="admin-input"
+                <Combobox
                   value={responsibleId}
-                  onChange={(event) => setResponsibleId(event.target.value)}
-                  required
-                >
-                  <option value="">Selecione</option>
-                  {clients.data?.map((client) => (
-                    <option key={client.id} value={client.id}>
-                      {client.name}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={setResponsibleId}
+                  options={(clients.data ?? []).map((client) => ({ value: client.id, label: client.name }))}
+                  placeholder="Selecione o Cliente"
+                  searchPlaceholder="Buscar Cliente..."
+                />
               </label>
               <fieldset className="mt-5">
                 <legend className="text-sm font-semibold text-slate-600">
@@ -321,10 +350,9 @@ export function AgendaPage() {
                       key={space.id}
                       className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm ${spaceIds.includes(space.id) ? "border-emerald-500 bg-emerald-50" : "border-slate-200"}`}
                     >
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={spaceIds.includes(space.id)}
-                        onChange={() =>
+                        onCheckedChange={() =>
                           setSpaceIds((current) =>
                             current.includes(space.id)
                               ? current.filter((id) => id !== space.id)
@@ -341,31 +369,9 @@ export function AgendaPage() {
                     ))}
                 </div>
               </fieldset>
-              <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                <label className="text-sm font-semibold text-slate-600">
-                  Início previsto
-                  <input
-                    className="admin-input"
-                    type="datetime-local"
-                    value={period.start}
-                    onChange={(event) =>
-                      setPeriod({ ...period, start: event.target.value })
-                    }
-                    required
-                  />
-                </label>
-                <label className="text-sm font-semibold text-slate-600">
-                  Fim previsto
-                  <input
-                    className="admin-input"
-                    type="datetime-local"
-                    value={period.end}
-                    onChange={(event) =>
-                      setPeriod({ ...period, end: event.target.value })
-                    }
-                    required
-                  />
-                </label>
+              <div className="mt-5">
+                <p className="mb-2 text-sm font-semibold text-slate-600">Data e período previstos</p>
+                <SessionSchedulePicker start={period.start} end={period.end} onChange={setPeriod} />
               </div>
               <div className="mt-7 flex justify-end gap-2">
                 <button
@@ -472,20 +478,14 @@ function SessionCard({
           {["scheduled", "confirmed", "in_progress"].includes(
             session.status,
           ) && (
-            <button
-              className="operation-button"
-              disabled={pending}
-              onClick={() => {
-                if (
-                  globalThis.confirm(
-                    "Cancelar esta Sessão? Se ela ainda não tiver eventos associados, a agenda será excluída definitivamente.",
-                  )
-                )
-                  onAction("cancel");
-              }}
-            >
-              Cancelar
-            </button>
+            <ConfirmationAlertDialog
+              title="Cancelar Sessão?"
+              description="Se a Sessão ainda não tiver eventos associados, a agenda será excluída definitivamente. Sessões com histórico operacional serão preservadas como canceladas."
+              confirmLabel="Cancelar Sessão"
+              pending={pending}
+              onConfirm={() => onAction("cancel")}
+              trigger={<button className="operation-button" disabled={pending}>Cancelar</button>}
+            />
           )}
         </div>
       </div>

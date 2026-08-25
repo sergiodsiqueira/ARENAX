@@ -24,6 +24,10 @@ class AgendaUnitOfWork:
         self.query = (start, end, space_id)
         return self.sessions
 
+    async def list_in_progress_sessions(self):
+        self.query = "in_progress"
+        return self.sessions
+
 
 @pytest.mark.asyncio
 async def test_agenda_delegates_temporal_projection_to_repository():
@@ -46,3 +50,14 @@ async def test_agenda_rejects_invalid_or_timezone_naive_window():
         await service.agenda(NOW, NOW)
     with pytest.raises(ValueError, match="timezone"):
         await service.agenda(NOW.replace(tzinfo=None), NOW + timedelta(hours=1))
+
+
+@pytest.mark.asyncio
+async def test_in_progress_sessions_use_status_projection_without_date_window():
+    expected = [Session(uuid4(), (uuid4(),), NOW, NOW + timedelta(hours=1))]
+    uow = AgendaUnitOfWork(expected)
+
+    result = await SessionService(lambda: uow).in_progress()
+
+    assert result == expected
+    assert uow.query == "in_progress"

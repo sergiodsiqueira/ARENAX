@@ -2,8 +2,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus, Trash2, UserRound } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
+import { toast } from "sonner";
 import { AppShell } from "../components/AppShell";
 import { StatusCounterCard } from "../components/StatusCounterCard";
+import { ConfirmationAlertDialog } from "../components/ui/confirmation-alert-dialog";
+import { Combobox } from "../components/ui/combobox";
+import { Input } from "../components/ui/input";
 import {
   createClient,
   deleteClient,
@@ -19,8 +23,7 @@ export function ClientsAdministrationPage() {
   const [filter, setFilter] = useState<Filter>("active"),
     [modal, setModal] = useState<Client | "new" | null>(null),
     [name, setName] = useState(""),
-    [status, setStatus] = useState<Client["administrative_status"]>("active"),
-    [feedback, setFeedback] = useState<string | null>(null);
+    [status, setStatus] = useState<Client["administrative_status"]>("active");
   const user = useQuery({
       queryKey: ["current-user"],
       queryFn: getCurrentUser,
@@ -41,20 +44,20 @@ export function ClientsAdministrationPage() {
           }),
     onSuccess: () => {
       setModal(null);
-      setFeedback("Cliente salvo com sucesso.");
+      toast.success("Cliente salvo com sucesso.");
       refresh();
     },
     onError: (e) =>
-      setFeedback(e instanceof Error ? e.message : "Não foi possível salvar."),
+      toast.error(e instanceof Error ? e.message : "Não foi possível salvar."),
   });
   const remove = useMutation({
     mutationFn: deleteClient,
     onSuccess: () => {
-      setFeedback("Cliente excluído.");
+      toast.success("Cliente excluído.");
       refresh();
     },
     onError: (e) =>
-      setFeedback(e instanceof Error ? e.message : "Não foi possível excluir."),
+      toast.error(e instanceof Error ? e.message : "Não foi possível excluir."),
   });
   const counts = {
     active:
@@ -94,11 +97,6 @@ export function ClientsAdministrationPage() {
             <Plus size={17} /> Cadastrar
           </button>
         </header>
-        {feedback && (
-          <div className="mt-5 rounded-xl border bg-white p-3 text-sm">
-            {feedback}
-          </div>
-        )}
         <div className="mt-7 grid gap-3 sm:grid-cols-3">
           <StatusCounterCard
             kind="active"
@@ -150,16 +148,14 @@ export function ClientsAdministrationPage() {
                 >
                   <Pencil size={17} />
                 </button>
-                <button
-                  className="rounded-lg p-2 hover:bg-rose-50 hover:text-rose-700"
-                  onClick={() =>
-                    globalThis.confirm(`Excluir ${item.name}?`) &&
-                    remove.mutate(item.id)
-                  }
-                  aria-label="Excluir"
-                >
-                  <Trash2 size={17} />
-                </button>
+                <ConfirmationAlertDialog
+                  title="Excluir Cliente?"
+                  description={`O Cliente ${item.name} será removido definitivamente. A exclusão será bloqueada se ele for Responsável por alguma Sessão.`}
+                  confirmLabel="Excluir Cliente"
+                  pending={remove.isPending}
+                  onConfirm={() => remove.mutate(item.id)}
+                  trigger={<button className="rounded-lg p-2 hover:bg-rose-50 hover:text-rose-700" aria-label={`Excluir ${item.name}`}><Trash2 size={17} /></button>}
+                />
               </div>
             </div>
           ))}
@@ -183,8 +179,8 @@ export function ClientsAdministrationPage() {
               </h2>
               <label className="mt-5 block text-sm font-semibold">
                 Descrição
-                <input
-                  className="admin-input"
+                <Input
+                  className="mt-2"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
@@ -194,18 +190,11 @@ export function ClientsAdministrationPage() {
               {modal !== "new" && (
                 <label className="mt-4 block text-sm font-semibold">
                   Estado
-                  <select
-                    className="admin-input"
+                  <Combobox
                     value={status}
-                    onChange={(e) =>
-                      setStatus(
-                        e.target.value as Client["administrative_status"],
-                      )
-                    }
-                  >
-                    <option value="active">Ativo</option>
-                    <option value="inactive">Inativo</option>
-                  </select>
+                    onValueChange={(value) => setStatus(value as Client["administrative_status"])}
+                    options={[{ value: "active", label: "Ativo" }, { value: "inactive", label: "Inativo" }]}
+                  />
                 </label>
               )}
               <div className="mt-6 flex justify-end gap-2">

@@ -10,8 +10,12 @@ import {
 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
+import { toast } from "sonner";
 import { AppShell } from "../components/AppShell";
 import { StatusCounterCard } from "../components/StatusCounterCard";
+import { ConfirmationAlertDialog } from "../components/ui/confirmation-alert-dialog";
+import { Combobox } from "../components/ui/combobox";
+import { Input } from "../components/ui/input";
 import {
   createEquipment,
   deleteEquipment,
@@ -55,7 +59,6 @@ export function EquipmentsAdministrationPage() {
   const [filter, setFilter] = useState<Filter>("active"),
     [modal, setModal] = useState<Equipment | "new" | null>(null),
     [form, setForm] = useState<Form>(empty),
-    [feedback, setFeedback] = useState<string | null>(null),
     [live, setLive] = useState<Equipment | null>(null);
   const user = useQuery({
       queryKey: ["current-user"],
@@ -81,20 +84,20 @@ export function EquipmentsAdministrationPage() {
     onSuccess: () => {
       setModal(null);
       setForm(empty);
-      setFeedback("Equipamento salvo com sucesso.");
+      toast.success("Equipamento salvo com sucesso.");
       refresh();
     },
     onError: (e) =>
-      setFeedback(e instanceof Error ? e.message : "Não foi possível salvar."),
+      toast.error(e instanceof Error ? e.message : "Não foi possível salvar."),
   });
   const remove = useMutation({
     mutationFn: deleteEquipment,
     onSuccess: () => {
-      setFeedback("Equipamento excluído.");
+      toast.success("Equipamento excluído.");
       refresh();
     },
     onError: (e) =>
-      setFeedback(e instanceof Error ? e.message : "Não foi possível excluir."),
+      toast.error(e instanceof Error ? e.message : "Não foi possível excluir."),
   });
   const names = useMemo(
     () => new Map((spaces.data ?? []).map((x) => [x.id, x.name])),
@@ -153,11 +156,6 @@ export function EquipmentsAdministrationPage() {
             <Plus size={17} /> Cadastrar
           </button>
         </header>
-        {feedback && (
-          <div className="mt-5 rounded-xl border bg-white p-3 text-sm">
-            {feedback}
-          </div>
-        )}
         <div className="mt-7 grid gap-3 sm:grid-cols-3">
           <StatusCounterCard
             kind="active"
@@ -214,16 +212,14 @@ export function EquipmentsAdministrationPage() {
                 >
                   <Pencil size={17} />
                 </button>
-                <button
-                  className="rounded-lg p-2 hover:bg-rose-50"
-                  onClick={() =>
-                    globalThis.confirm(
-                      `Excluir ${x.external_id}?\n\nO vínculo e o histórico do cadastro serão perdidos.`,
-                    ) && remove.mutate(x.id)
-                  }
-                >
-                  <Trash2 size={17} />
-                </button>
+                <ConfirmationAlertDialog
+                  title="Excluir Equipamento?"
+                  description={`O Equipamento ${x.external_id} e seu vínculo administrativo serão removidos definitivamente. A auditoria pertencente à Sessão será preservada.`}
+                  confirmLabel="Excluir Equipamento"
+                  pending={remove.isPending}
+                  onConfirm={() => remove.mutate(x.id)}
+                  trigger={<button className="rounded-lg p-2 hover:bg-rose-50 hover:text-rose-700" aria-label={`Excluir ${x.external_id}`}><Trash2 size={17} /></button>}
+                />
               </div>
             </div>
           ))}
@@ -250,41 +246,26 @@ export function EquipmentsAdministrationPage() {
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
                 <label className="text-sm font-semibold">
                   Espaço
-                  <select
-                    className="admin-input"
+                  <Combobox
                     value={form.spaceId}
-                    onChange={(e) =>
-                      setForm({ ...form, spaceId: e.target.value })
-                    }
-                  >
-                    <option value="">Selecione</option>
-                    {spaces.data?.map((x) => (
-                      <option key={x.id} value={x.id}>
-                        {x.name}
-                      </option>
-                    ))}
-                  </select>
+                    onValueChange={(value) => setForm({ ...form, spaceId: value })}
+                    options={(spaces.data ?? []).map((space) => ({ value: space.id, label: space.name }))}
+                    placeholder="Selecione o Espaço"
+                    searchPlaceholder="Buscar Espaço..."
+                  />
                 </label>
                 <label className="text-sm font-semibold">
                   Tipo
-                  <select
-                    className="admin-input"
+                  <Combobox
                     value={form.kind}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        kind: e.target.value as Equipment["kind"],
-                      })
-                    }
-                  >
-                    <option value="camera">Câmera</option>
-                    <option value="ax_device">AX Device</option>
-                  </select>
+                    onValueChange={(value) => setForm({ ...form, kind: value as Equipment["kind"] })}
+                    options={[{ value: "camera", label: "Câmera" }, { value: "ax_device", label: "AX Device" }]}
+                  />
                 </label>
                 <label className="text-sm font-semibold">
                   Descrição
-                  <input
-                    className="admin-input"
+                  <Input
+                    className="mt-2"
                     value={form.externalId}
                     onChange={(e) =>
                       setForm({ ...form, externalId: e.target.value })
@@ -293,26 +274,17 @@ export function EquipmentsAdministrationPage() {
                 </label>
                 <label className="text-sm font-semibold">
                   Estado
-                  <select
-                    className="admin-input"
+                  <Combobox
                     value={form.status}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        status: e.target
-                          .value as Equipment["administrative_status"],
-                      })
-                    }
-                  >
-                    <option value="active">Ativo</option>
-                    <option value="inactive">Inativo</option>
-                  </select>
+                    onValueChange={(value) => setForm({ ...form, status: value as Equipment["administrative_status"] })}
+                    options={[{ value: "active", label: "Ativo" }, { value: "inactive", label: "Inativo" }]}
+                  />
                 </label>
                 {form.kind === "camera" && (
                   <label className="text-sm font-semibold sm:col-span-2">
                     URL RTSP
-                    <input
-                      className="admin-input font-mono"
+                    <Input
+                      className="mt-2 font-mono"
                       value={form.captureUrl}
                       onChange={(e) =>
                         setForm({ ...form, captureUrl: e.target.value })

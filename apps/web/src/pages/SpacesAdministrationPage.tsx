@@ -2,8 +2,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { MapPin, Pencil, Plus, Trash2 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
+import { toast } from "sonner";
 import { AppShell } from "../components/AppShell";
 import { StatusCounterCard } from "../components/StatusCounterCard";
+import { ConfirmationAlertDialog } from "../components/ui/confirmation-alert-dialog";
+import { Combobox } from "../components/ui/combobox";
+import { Input } from "../components/ui/input";
 import {
   createSpace,
   deleteSpace,
@@ -20,8 +24,7 @@ export function SpacesAdministrationPage() {
   const [filter, setFilter] = useState<Filter>("active"),
     [modal, setModal] = useState<Space | "new" | null>(null),
     [name, setName] = useState(""),
-    [status, setStatus] = useState("active"),
-    [feedback, setFeedback] = useState<string | null>(null);
+    [status, setStatus] = useState("active");
   const user = useQuery({
       queryKey: ["current-user"],
       queryFn: getCurrentUser,
@@ -42,20 +45,20 @@ export function SpacesAdministrationPage() {
           }),
     onSuccess: () => {
       setModal(null);
-      setFeedback("Espaço salvo com sucesso.");
+      toast.success("Espaço salvo com sucesso.");
       refresh();
     },
     onError: (e) =>
-      setFeedback(e instanceof Error ? e.message : "Não foi possível salvar."),
+      toast.error(e instanceof Error ? e.message : "Não foi possível salvar."),
   });
   const remove = useMutation({
     mutationFn: deleteSpace,
     onSuccess: () => {
-      setFeedback("Espaço excluído.");
+      toast.success("Espaço excluído.");
       refresh();
     },
     onError: (e) =>
-      setFeedback(e instanceof Error ? e.message : "Não foi possível excluir."),
+      toast.error(e instanceof Error ? e.message : "Não foi possível excluir."),
   });
   const counts = {
     active: spaces.data?.filter((x) => !inactive(x)).length ?? 0,
@@ -91,11 +94,6 @@ export function SpacesAdministrationPage() {
             <Plus size={17} /> Cadastrar
           </button>
         </header>
-        {feedback && (
-          <div className="mt-5 rounded-xl border bg-white p-3 text-sm">
-            {feedback}
-          </div>
-        )}
         <div className="mt-7 grid gap-3 sm:grid-cols-3">
           <StatusCounterCard
             kind="active"
@@ -148,15 +146,14 @@ export function SpacesAdministrationPage() {
                 >
                   <Pencil size={17} />
                 </button>
-                <button
-                  className="rounded-lg p-2 hover:bg-rose-50"
-                  onClick={() =>
-                    globalThis.confirm(`Excluir ${x.name}?`) &&
-                    remove.mutate(x.id)
-                  }
-                >
-                  <Trash2 size={17} />
-                </button>
+                <ConfirmationAlertDialog
+                  title="Excluir Espaço?"
+                  description={`O Espaço ${x.name} será removido definitivamente. A exclusão será bloqueada se houver Sessões ou Equipamentos vinculados.`}
+                  confirmLabel="Excluir Espaço"
+                  pending={remove.isPending}
+                  onConfirm={() => remove.mutate(x.id)}
+                  trigger={<button className="rounded-lg p-2 hover:bg-rose-50 hover:text-rose-700" aria-label={`Excluir ${x.name}`}><Trash2 size={17} /></button>}
+                />
               </div>
             </div>
           ))}
@@ -180,8 +177,8 @@ export function SpacesAdministrationPage() {
               </h2>
               <label className="mt-5 block text-sm font-semibold">
                 Descrição
-                <input
-                  className="admin-input"
+                <Input
+                  className="mt-2"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
@@ -189,15 +186,11 @@ export function SpacesAdministrationPage() {
               </label>
               <label className="mt-4 block text-sm font-semibold">
                 Estado
-                <select
-                  className="admin-input"
+                <Combobox
                   value={status}
-                  onChange={(e) => setStatus(e.target.value)}
-                >
-                  <option value="active">Ativo</option>
-                  <option value="maintenance">Manutenção</option>
-                  <option value="disabled">Desativado</option>
-                </select>
+                  onValueChange={setStatus}
+                  options={[{ value: "active", label: "Ativo" }, { value: "maintenance", label: "Manutenção" }, { value: "disabled", label: "Desativado" }]}
+                />
               </label>
               <div className="mt-6 flex justify-end gap-2">
                 <button

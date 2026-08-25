@@ -5,6 +5,17 @@ info:
 security:
   - cookieAuth: []
 paths:
+  /api/v1/operational-events:
+    get:
+      operationId: streamOperationalEvents
+      summary: Stream signals that operational projections should be refreshed.
+      responses:
+        '200':
+          description: Server-Sent Events stream. Each `operational-update` event contains an OperationalEvent JSON payload.
+          content:
+            text/event-stream:
+              schema: {type: string}
+        '401': {description: Access absent, expired or revoked}
   /api/v1/auth/login:
     post:
       security: []
@@ -209,6 +220,16 @@ paths:
       responses:
         '201': {$ref: '#/components/responses/Session'}
         '409': {$ref: '#/components/responses/Conflict'}
+  /api/v1/sessions/in-progress:
+    get:
+      operationId: listInProgressSessions
+      summary: List every Session currently in progress, independent of its scheduled date.
+      responses:
+        '200':
+          description: In-progress Sessions ordered by actual start.
+          content:
+            application/json:
+              schema: {type: array, items: {$ref: '#/components/schemas/Session'}}
   /api/v1/sessions/{sessionId}/actions/{action}:
     post:
       operationId: transitionSession
@@ -279,6 +300,13 @@ components:
       description: Domain invariant rejected the intention
       content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
   schemas:
+    OperationalEvent:
+      type: object
+      required: [resource, occurred_at]
+      properties:
+        resource: {type: string, enum: [sessions, spaces, clients]}
+        occurred_at: {type: string, format: date-time}
+        entity_id: {type: [string, 'null'], format: uuid}
     LoginInput:
       type: object
       required: [email, password]

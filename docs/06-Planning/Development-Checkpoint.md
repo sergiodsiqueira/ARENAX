@@ -50,6 +50,12 @@ não foram commitadas.
 - Dossiê da Sessão acessível pela Agenda e Mission Control, com resumo operacional,
   período previsto/real, Timeline, Momentos e galeria de Replays com atualização
   durante o processamento.
+- Mission Control atualizado em tempo real por SSE autenticado, com polling de
+  contingência durante desconexões.
+- Agenda com alternância para uma visão global de todas as Sessões Em andamento,
+  independente da data selecionada.
+- Fundação do design system migrada para shadcn/ui com Tailwind 4, tokens visuais
+  da ARENAX e componentes-base versionados no frontend.
 
 ## Navegação atual
 
@@ -65,7 +71,7 @@ não foram commitadas.
 
 ## Validação mais recente
 
-- API: 43 testes aprovados no Docker.
+- API: 46 testes aprovados no Docker.
 - Frontend: ESLint aprovado.
 - Frontend: build de produção aprovado.
 - Migration atual do banco: `0005`.
@@ -83,7 +89,7 @@ não foram commitadas.
 
 ## Próximos passos sugeridos
 
-1. Substituir atualizações periódicas do Mission Control por eventos em tempo real.
+1. Implementar Compartilhamento de Replays por link seguro.
 
 ## Retomada
 

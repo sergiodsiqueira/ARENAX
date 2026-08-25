@@ -1,10 +1,14 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail, Radio } from "lucide-react";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { useNavigate } from "react-router";
+import { toast } from "sonner";
 import { z } from "zod";
 
+import { Button } from "../components/ui/button";
+import { Checkbox } from "../components/ui/checkbox";
+import { Input } from "../components/ui/input";
 import { login } from "../lib/api";
 
 const loginSchema = z.object({
@@ -18,9 +22,9 @@ type LoginForm = z.infer<typeof loginSchema>;
 export function LoginPage() {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
-  const [accessError, setAccessError] = useState<string | null>(null);
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<LoginForm>({
@@ -29,12 +33,11 @@ export function LoginPage() {
   });
 
   const submit = async (data: LoginForm) => {
-    setAccessError(null);
     try {
       const user = await login(data);
       navigate("/mission-control", { replace: true, state: { user } });
     } catch (error) {
-      setAccessError(error instanceof Error ? error.message : "Não foi possível entrar.");
+      toast.error(error instanceof Error ? error.message : "Não foi possível entrar.");
     }
   };
 
@@ -87,7 +90,8 @@ export function LoginPage() {
               <label className="field-label" htmlFor="email">E-mail</label>
               <div className={`field-shell ${errors.email ? "field-error" : ""}`}>
                 <Mail size={19} aria-hidden="true" />
-                <input
+                <Input
+                  className="h-auto border-0 bg-transparent px-0 shadow-none focus-visible:border-0 focus-visible:ring-0"
                   id="email"
                   type="email"
                   autoComplete="email"
@@ -102,13 +106,14 @@ export function LoginPage() {
             <div>
               <div className="mb-2 flex items-center justify-between">
                 <label className="field-label mb-0" htmlFor="password">Senha</label>
-                <button className="text-sm font-semibold text-emerald-700 hover:text-emerald-800" type="button">
+                <Button className="h-auto p-0" variant="link" type="button">
                   Esqueci minha senha
-                </button>
+                </Button>
               </div>
               <div className={`field-shell ${errors.password ? "field-error" : ""}`}>
                 <LockKeyhole size={19} aria-hidden="true" />
-                <input
+                <Input
+                  className="h-auto border-0 bg-transparent px-0 shadow-none focus-visible:border-0 focus-visible:ring-0"
                   id="password"
                   type={showPassword ? "text" : "password"}
                   autoComplete="current-password"
@@ -116,33 +121,44 @@ export function LoginPage() {
                   aria-invalid={Boolean(errors.password)}
                   {...register("password")}
                 />
-                <button
-                  className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-8 text-muted-foreground"
                   type="button"
                   onClick={() => setShowPassword((value) => !value)}
                   aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
                 >
                   {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
-                </button>
+                </Button>
               </div>
               {errors.password && <p className="error-message">{errors.password.message}</p>}
             </div>
 
-            <label className="flex w-fit cursor-pointer items-center gap-3 text-sm text-slate-600">
-              <input className="remember-checkbox" type="checkbox" {...register("remember")} />
-              Manter meu acesso neste dispositivo
-            </label>
+            <div className="flex w-fit items-center gap-3">
+              <Controller
+                name="remember"
+                control={control}
+                render={({ field }) => (
+                  <Checkbox
+                    id="remember"
+                    checked={field.value}
+                    onCheckedChange={(checked) => field.onChange(checked === true)}
+                    onBlur={field.onBlur}
+                    name={field.name}
+                    ref={field.ref}
+                  />
+                )}
+              />
+              <label className="cursor-pointer text-sm text-slate-600" htmlFor="remember">
+                Manter meu acesso neste dispositivo
+              </label>
+            </div>
 
-            {accessError && (
-              <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-900" role="alert">
-                {accessError}
-              </div>
-            )}
-
-            <button className="primary-button group" type="submit" disabled={isSubmitting}>
+            <Button className="group h-13 w-full rounded-xl text-base font-bold shadow-lg shadow-primary/15" size="lg" type="submit" disabled={isSubmitting}>
               Entrar na ARENAX
               <ArrowRight className="transition-transform group-hover:translate-x-0.5" size={19} aria-hidden="true" />
-            </button>
+            </Button>
           </form>
 
           <p className="mt-12 text-center text-sm text-slate-400">

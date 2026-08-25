@@ -27,6 +27,34 @@ export type ArenaSession = {
   actual_end: string | null;
 };
 
+export type OperationalEvent = {
+  resource: "sessions" | "spaces" | "clients";
+  occurred_at: string;
+  entity_id: string | null;
+};
+
+export function subscribeToOperationalEvents(
+  onEvent: (event: OperationalEvent) => void,
+  onConnectionChange: (connected: boolean) => void,
+) {
+  const source = new EventSource(`${API_URL}/api/v1/operational-events`, {
+    withCredentials: true,
+  });
+  source.addEventListener("ready", () => onConnectionChange(true));
+  source.addEventListener("operational-update", (message) => {
+    try {
+      onEvent(JSON.parse(message.data) as OperationalEvent);
+    } catch {
+      // Ignore malformed signals; the fallback polling still refreshes server state.
+    }
+  });
+  source.onerror = () => onConnectionChange(false);
+  return () => {
+    source.close();
+    onConnectionChange(false);
+  };
+}
+
 async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
     ...init,
@@ -85,6 +113,9 @@ export function getSessions(start: Date, end: Date): Promise<ArenaSession[]> {
   const query = new URLSearchParams({ start: start.toISOString(), end: end.toISOString() });
   return apiRequest<ArenaSession[]>(`/api/v1/sessions?${query}`);
 }
+
+export const getInProgressSessions = () =>
+  apiRequest<ArenaSession[]>("/api/v1/sessions/in-progress");
 
 export function transitionSession(sessionId: string, action: "confirm" | "start" | "finish" | "cancel" | "no_show") {
   return apiRequest<ArenaSession | undefined>(`/api/v1/sessions/${sessionId}/actions/${action}`, { method: "POST" });

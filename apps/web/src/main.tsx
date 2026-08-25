@@ -11,6 +11,7 @@ import { SpacesAdministrationPage } from "./pages/SpacesAdministrationPage";
 import { EquipmentsAdministrationPage } from "./pages/EquipmentsAdministrationPage";
 import { AgendaPage } from "./pages/AgendaPage";
 import { SessionDossierPage } from "./pages/SessionDossierPage";
+import { Toaster } from "./components/ui/sonner";
 import "./styles.css";
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: true } } });
@@ -31,6 +32,7 @@ createRoot(document.getElementById("root")!).render(
           <Route path="/administracao/clientes" element={<Navigate to="/cadastros/clientes" replace />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
+      <Toaster />
     </BrowserRouter>
     </QueryClientProvider>
   </StrictMode>,

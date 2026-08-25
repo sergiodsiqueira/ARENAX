@@ -288,6 +288,17 @@ class SqlAlchemyUnitOfWork:
         )
         if space_id is not None:
             query = query.join(SessionSpaceModel).where(SessionSpaceModel.space_id == space_id)
+        return await self._hydrate_sessions(query)
+
+    async def list_in_progress_sessions(self) -> list[Session]:
+        query = (
+            select(SessionModel)
+            .where(SessionModel.status == SessionStatus.IN_PROGRESS.value)
+            .order_by(SessionModel.actual_start, SessionModel.id)
+        )
+        return await self._hydrate_sessions(query)
+
+    async def _hydrate_sessions(self, query) -> list[Session]:
         models = list(await self.session.scalars(query))
         if not models:
             return []

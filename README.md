@@ -66,6 +66,8 @@ docker compose run --rm api python -m arenax.cli.create_user `
 ```
 
 O login web fica em `http://localhost:5173/login` e usa cookie HttpOnly.
+O Mission Control recebe sinais operacionais em tempo real por SSE autenticado e
+mantém polling automático como contingência durante desconexões.
 
 ## Initial Structure
 

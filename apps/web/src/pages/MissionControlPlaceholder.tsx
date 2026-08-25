@@ -2,8 +2,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, CalendarClock, CheckCircle2, Clock3, Play, Radio, Square, TimerReset, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
+import { toast } from "sonner";
 import { AppShell } from "../components/AppShell";
-import { extendSession, getClients, getCurrentUser, getSessions, getSpaces, transitionSession, type ArenaSession } from "../lib/api";
+import { Combobox } from "../components/ui/combobox";
+import { extendSession, getClients, getCurrentUser, getSessions, getSpaces, subscribeToOperationalEvents, transitionSession, type ArenaSession } from "../lib/api";
 
 const activeStatuses = new Set(["scheduled", "confirmed", "in_progress"]);
 const formatTime = (value: string) => new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(new Date(value));
@@ -35,8 +37,8 @@ export function MissionControlPlaceholder() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [now, setNow] = useState(() => new Date());
-  const [actionError, setActionError] = useState<string | null>(null);
   const [spaceStatusFilter, setSpaceStatusFilter] = useState<SpaceStatusFilter>("all");
+  const [realTimeConnected, setRealTimeConnected] = useState(false);
   const day = useMemo(() => {
     const start = new Date(now); start.setHours(0, 0, 0, 0);
     const end = new Date(start); end.setDate(end.getDate() + 1);
@@ -47,14 +49,24 @@ export function MissionControlPlaceholder() {
   const userQuery = useQuery({ queryKey: ["current-user"], queryFn: getCurrentUser, retry: false });
   const spacesQuery = useQuery({ queryKey: ["spaces"], queryFn: getSpaces });
   const clientsQuery = useQuery({ queryKey: ["clients"], queryFn: getClients });
-  const sessionsQuery = useQuery({ queryKey: ["sessions", day.start.toISOString()], queryFn: () => getSessions(day.start, day.end), refetchInterval: 15_000 });
+  const sessionsQuery = useQuery({ queryKey: ["sessions", day.start.toISOString()], queryFn: () => getSessions(day.start, day.end), refetchInterval: realTimeConnected ? false : 15_000 });
   useEffect(() => { if (userQuery.isError) navigate("/login", { replace: true }); }, [navigate, userQuery.isError]);
+  useEffect(() => {
+    if (!userQuery.data) return;
+    return subscribeToOperationalEvents(
+      (event) => queryClient.invalidateQueries({ queryKey: [event.resource] }),
+      setRealTimeConnected,
+    );
+  }, [queryClient, userQuery.data]);
 
   const action = useMutation({
     mutationFn: ({ session, kind }: { session: ArenaSession; kind: "start" | "finish" | "cancel" | "extend" }) => kind === "extend" ? extendSession(session) : transitionSession(session.id, kind),
-    onMutate: () => setActionError(null),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["sessions"] }),
-    onError: (error) => setActionError(error instanceof Error ? error.message : "Não foi possível atualizar a Sessão."),
+    onSuccess: (_result, { kind }) => {
+      const messages = { start: "Sessão iniciada.", finish: "Sessão finalizada.", cancel: "Sessão cancelada.", extend: "Sessão prorrogada em 30 minutos." };
+      toast.success(messages[kind]);
+      queryClient.invalidateQueries({ queryKey: ["sessions"] });
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Não foi possível atualizar a Sessão."),
   });
 
   const sessions = sessionsQuery.data ?? [];
@@ -75,10 +87,9 @@ export function MissionControlPlaceholder() {
   const loadError = spacesQuery.error || sessionsQuery.error || clientsQuery.error;
   return <AppShell user={userQuery.data}>
     <main className="mx-auto max-w-7xl px-5 py-7 sm:px-8 sm:py-10">
-      <section className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end"><div><p className="mb-2 text-sm font-semibold tracking-wide text-emerald-700">OPERAÇÃO AO VIVO</p><h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Visão geral da arena</h1><p className="mt-2 text-slate-500">{new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "2-digit", month: "long" }).format(now)} · {formatTime(now.toISOString())}</p></div><div className="flex items-center gap-2 text-sm font-medium text-emerald-700"><Radio size={16} /> Atualização automática</div></section>
+      <section className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end"><div><p className="mb-2 text-sm font-semibold tracking-wide text-emerald-700">OPERAÇÃO AO VIVO</p><h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Visão geral da arena</h1><p className="mt-2 text-slate-500">{new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "2-digit", month: "long" }).format(now)} · {formatTime(now.toISOString())}</p></div><div className={`flex items-center gap-2 text-sm font-medium ${realTimeConnected ? "text-emerald-700" : "text-amber-700"}`}><Radio size={16} /> {realTimeConnected ? "Tempo real conectado" : "Reconectando · atualização automática"}</div></section>
       <section className={`mt-8 rounded-2xl border p-5 ${attentionCount ? "border-amber-200 bg-amber-50" : "border-emerald-200 bg-emerald-50"}`}><div className="flex items-start gap-3">{attentionCount ? <AlertTriangle className="mt-0.5 text-amber-600" size={21} /> : <CheckCircle2 className="mt-0.5 text-emerald-600" size={21} />}<div><p className="font-semibold">{attentionCount ? `${attentionCount} Espaço${attentionCount > 1 ? "s precisam" : " precisa"} de atenção` : "Arena operando normalmente"}</p><p className="mt-1 text-sm text-slate-600">{activeCount} Sessão{activeCount !== 1 ? "ões" : ""} em andamento agora.</p></div></div></section>
-      {actionError && <div className="mt-5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900" role="alert">{actionError}</div>}
-      <section className="mt-8"><div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><h2 className="text-xl font-semibold">Espaços</h2><label className="flex items-center gap-2 text-sm font-medium text-slate-600"><span>Status</span><select className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" value={spaceStatusFilter} onChange={(event) => setSpaceStatusFilter(event.target.value as SpaceStatusFilter)}><option value="all">Todos ({spaces.length})</option>{Object.entries(presentation).map(([status, item]) => <option key={status} value={status}>{item.label} ({spaces.filter((space) => getState(currentBySpace.get(space.id), space.administrative_status, now) === status).length})</option>)}</select></label></div>
+      <section className="mt-8"><div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><h2 className="text-xl font-semibold">Espaços</h2><div className="flex min-h-9 items-center gap-2 text-sm font-medium text-slate-600"><span className="shrink-0 leading-none">Status</span><Combobox className="mt-0 h-9 w-52 shrink-0" value={spaceStatusFilter} onValueChange={(value) => setSpaceStatusFilter(value as SpaceStatusFilter)} options={[{ value: "all", label: `Todos (${spaces.length})` }, ...Object.entries(presentation).map(([status, item]) => ({ value: status, label: `${item.label} (${spaces.filter((space) => getState(currentBySpace.get(space.id), space.administrative_status, now) === status).length})` }))]} searchPlaceholder="Buscar status..." /></div></div>
         {loading && <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{[1,2,3].map((item) => <div key={item} className="h-64 animate-pulse rounded-2xl border border-slate-200 bg-white" />)}</div>}
         {loadError && <div className="rounded-2xl border border-rose-200 bg-white p-8 text-center text-rose-800">Não foi possível carregar a operação. Uma nova tentativa será feita automaticamente.</div>}
         {!loading && !loadError && spaces.length === 0 && <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500">Nenhum Espaço cadastrado.</div>}

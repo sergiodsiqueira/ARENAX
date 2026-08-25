@@ -1,3 +1,4 @@
+import asyncio
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -6,7 +7,7 @@ from uuid import UUID
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
 from arenax.application.auth import AuthenticationService, UserAdministrationService
 from arenax.application.use_cases import (
@@ -24,6 +25,7 @@ from arenax.domain.errors import (
 from arenax.domain.identity import User, UserRole, UserStatus
 from arenax.infrastructure.config import settings
 from arenax.infrastructure.live_gateway import LiveGatewayUnavailable, MediaMtxGateway
+from arenax.infrastructure.operational_events import operational_events
 from arenax.infrastructure.security import (
     Argon2PasswordHasher,
     hash_access_token,
@@ -51,9 +53,9 @@ from .schemas import (
     ResetUserPasswordRequest,
     SessionResponse,
     SpaceResponse,
-    UpdateUserRequest,
-    UpdateSpaceRequest,
     UpdateClientRequest,
+    UpdateSpaceRequest,
+    UpdateUserRequest,
     UserResponse,
 )
 
@@ -170,6 +172,25 @@ AuthenticatedUser = Annotated[User, Depends(require_authenticated_user)]
 AdministratorUser = Annotated[User, Depends(require_administrator)]
 
 
+@app.get("/api/v1/operational-events")
+async def stream_operational_events(request: Request, _user: AuthenticatedUser):
+    async def event_stream():
+        async with operational_events.subscribe() as queue:
+            yield "event: ready\ndata: {}\n\n"
+            while not await request.is_disconnected():
+                try:
+                    payload = await asyncio.wait_for(queue.get(), timeout=15)
+                    yield f"event: operational-update\ndata: {payload}\n\n"
+                except TimeoutError:
+                    yield ": keep-alive\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
 @app.post("/api/v1/auth/logout", status_code=204)
 async def logout(request: Request, response: Response):
     await authentication.logout(
@@ -212,7 +233,9 @@ async def reset_user_password(
 async def create_client(
     request: NamedResourceRequest, _user: AuthenticatedUser
 ):
-    return {"id": await infrastructure.create_client(request.name)}
+    client_id = await infrastructure.create_client(request.name)
+    operational_events.publish("clients", client_id)
+    return {"id": client_id}
 
 
 @app.get("/api/v1/clients", response_model=list[ClientResponse])
@@ -222,12 +245,15 @@ async def list_clients(_user: AuthenticatedUser):
 
 @app.put("/api/v1/clients/{client_id}", response_model=ClientResponse)
 async def update_client(client_id: UUID, request: UpdateClientRequest, _user: AuthenticatedUser):
-    return await infrastructure.update_client(client_id, request.name, request.administrative_status)
+    result = await infrastructure.update_client(client_id, request.name, request.administrative_status)
+    operational_events.publish("clients", client_id)
+    return result
 
 
 @app.delete("/api/v1/clients/{client_id}", status_code=204)
 async def delete_client(client_id: UUID, _user: AuthenticatedUser):
     await infrastructure.delete_client(client_id)
+    operational_events.publish("clients", client_id)
 
 
 @app.post("/api/v1/people", response_model=CreatedResourceResponse, status_code=201, deprecated=True)
@@ -244,7 +270,9 @@ async def list_people_compatibility(_user: AuthenticatedUser):
 async def create_space(
     request: NamedResourceRequest, _user: AdministratorUser
 ):
-    return {"id": await infrastructure.create_space(request.name)}
+    space_id = await infrastructure.create_space(request.name)
+    operational_events.publish("spaces", space_id)
+    return {"id": space_id}
 
 
 @app.get("/api/v1/spaces", response_model=list[SpaceResponse])
@@ -254,12 +282,15 @@ async def list_spaces(_user: AuthenticatedUser):
 
 @app.put("/api/v1/spaces/{space_id}", response_model=SpaceResponse)
 async def update_space(space_id: UUID, request: UpdateSpaceRequest, _user: AdministratorUser):
-    return await infrastructure.update_space(space_id, request.name, request.administrative_status)
+    result = await infrastructure.update_space(space_id, request.name, request.administrative_status)
+    operational_events.publish("spaces", space_id)
+    return result
 
 
 @app.delete("/api/v1/spaces/{space_id}", status_code=204)
 async def delete_space(space_id: UUID, _user: AdministratorUser):
     await infrastructure.delete_space(space_id)
+    operational_events.publish("spaces", space_id)
 
 
 @app.post("/api/v1/equipments", response_model=CreatedResourceResponse, status_code=201)
@@ -363,8 +394,10 @@ async def create_session(
     request: CreateSessionRequest, _user: AuthenticatedUser
 ):
     try:
-        return await sessions.create(request.responsible_client_id, tuple(request.space_ids),
+        result = await sessions.create(request.responsible_client_id, tuple(request.space_ids),
             request.scheduled_start, request.scheduled_end, datetime.now(UTC))
+        operational_events.publish("sessions", result.id)
+        return result
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
 
@@ -377,6 +410,11 @@ async def get_agenda(
     space_id: UUID | None = None,
 ):
     return await sessions.agenda(start, end, space_id)
+
+
+@app.get("/api/v1/sessions/in-progress", response_model=list[SessionResponse])
+async def get_in_progress_sessions(_user: AuthenticatedUser):
+    return await sessions.in_progress()
 
 
 @app.get("/api/v1/sessions/{session_id}")
@@ -393,6 +431,7 @@ async def transition_session(
     if action not in {"confirm", "start", "finish", "cancel", "no_show"}:
         raise HTTPException(404, "Unknown action")
     result = await sessions.transition(session_id, action, datetime.now(UTC))
+    operational_events.publish("sessions", session_id)
     if result is None:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     return result
@@ -404,7 +443,9 @@ async def extend_session(
     request: ExtendSessionRequest,
     _user: AuthenticatedUser,
 ):
-    return await sessions.transition(session_id, "extend", datetime.now(UTC), request.scheduled_end)
+    result = await sessions.transition(session_id, "extend", datetime.now(UTC), request.scheduled_end)
+    operational_events.publish("sessions", session_id)
+    return result
 
 
 @app.post("/api/v1/events/button-pressed", response_model=ButtonPressedResponse, status_code=202)
