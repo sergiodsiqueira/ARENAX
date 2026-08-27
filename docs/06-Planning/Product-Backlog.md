@@ -20,6 +20,7 @@
 | P2 | Pagamento | Registro manual. |
 | P2 | Health Center | Saúde de infraestrutura. |
 | P2 | Arena Designer | Editor visual. |
+| P2 | Configurações | Duração padrão de Sessão e janela anterior/posterior de Replay. |
 | P3 | Dashboard TV | Visão ampliada. |
 
 ## Priorização

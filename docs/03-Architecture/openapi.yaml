@@ -70,6 +70,21 @@ paths:
       responses:
         '204': {description: Password updated and existing Accesses revoked}
         '403': {description: User cannot be managed by the current User}
+  /api/v1/settings:
+    get:
+      operationId: getOperationalSettings
+      responses:
+        '200': {description: Global operational settings, content: {application/json: {schema: {$ref: '#/components/schemas/OperationalSettings'}}}}
+        '403': {description: Administrative permission required}
+    put:
+      operationId: updateOperationalSettings
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/OperationalSettingsInput'}}}
+      responses:
+        '200': {description: Operational settings updated, content: {application/json: {schema: {$ref: '#/components/schemas/OperationalSettings'}}}}
+        '403': {description: Administrative permission required}
+        '422': {description: Invalid duration values}
   /api/v1/clients:
     get:
       operationId: listClients
@@ -408,6 +423,19 @@ components:
       type: object
       required: [url]
       properties: {url: {type: string, format: uri}}
+    OperationalSettingsInput:
+      type: object
+      required: [default_session_duration_minutes, replay_pre_duration_seconds, replay_post_duration_seconds]
+      properties:
+        default_session_duration_minutes: {type: integer, minimum: 1}
+        replay_pre_duration_seconds: {type: integer, minimum: 0}
+        replay_post_duration_seconds: {type: integer, minimum: 0}
+    OperationalSettings:
+      allOf:
+        - {$ref: '#/components/schemas/OperationalSettingsInput'}
+        - type: object
+          required: [updated_at]
+          properties: {updated_at: {type: string, format: date-time}}
     SessionInput:
       type: object
       required: [responsible_client_id, space_ids, scheduled_start, scheduled_end]

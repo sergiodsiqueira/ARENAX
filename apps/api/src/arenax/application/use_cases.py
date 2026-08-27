@@ -264,6 +264,34 @@ class ArenaInfrastructureService:
         async with self._uow_factory() as uow:
             return await uow.list_equipments(space_id)
 
+    async def get_operational_settings(self) -> dict:
+        async with self._uow_factory() as uow:
+            return await uow.get_operational_settings()
+
+    async def update_operational_settings(
+        self,
+        default_session_duration_minutes: int,
+        replay_pre_duration_seconds: int,
+        replay_post_duration_seconds: int,
+        now: datetime,
+    ) -> dict:
+        if default_session_duration_minutes <= 0:
+            raise ValueError("A duração padrão da Sessão deve ser maior que zero")
+        if replay_pre_duration_seconds < 0 or replay_post_duration_seconds < 0:
+            raise ValueError("As durações do Replay não podem ser negativas")
+        if replay_pre_duration_seconds + replay_post_duration_seconds <= 0:
+            raise ValueError("A duração total do Replay deve ser maior que zero")
+        async with self._uow_factory() as uow:
+            await uow.get_operational_settings(lock=True)
+            result = await uow.update_operational_settings(
+                default_session_duration_minutes,
+                replay_pre_duration_seconds,
+                replay_post_duration_seconds,
+                now,
+            )
+            await uow.commit()
+            return result
+
     @staticmethod
     def _validate_binary_status(status: str, entity: str) -> None:
         if status not in {"active", "inactive"}:

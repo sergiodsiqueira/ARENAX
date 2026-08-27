@@ -17,6 +17,7 @@ permanecer em inglês enquanto os contratos existentes estiverem em vigor.
 | `caixa_de_saida` | Entrega confiável dos pedidos de Replay. |
 | `usuarios` | Identidades autorizadas a acessar a plataforma. |
 | `acessos` | Sessões de autenticação revogáveis dos Usuários. |
+| `configuracoes` | Valores operacionais globais da Arena no MVP. |
 
 ## Colunas principais
 
@@ -30,6 +31,24 @@ permanecer em inglês enquanto os contratos existentes estiverem em vigor.
 - `caixa_de_saida`: `tipo`, `agregado_id`, `dados`, `publicado_em`.
 - `usuarios`: `nome`, `email`, `senha_hash`, `papel`, `status`, `ultimo_acesso_em`.
 - `acessos`: `usuario_id`, `token_hash`, `criado_em`, `expira_em`, `revogado_em`.
+- `configuracoes`: `duracao_padrao_sessao_minutos`,
+  `duracao_replay_anterior_segundos`, `duracao_replay_posterior_segundos`,
+  `atualizado_em`.
+
+## Configurações iniciais
+
+Como o MVP atende uma única Arena, `configuracoes` possui um único registro criado
+pela migration, com os valores:
+
+| Coluna | Valor inicial |
+|---|---:|
+| `duracao_padrao_sessao_minutos` | `60` |
+| `duracao_replay_anterior_segundos` | `30` |
+| `duracao_replay_posterior_segundos` | `5` |
+
+A duração da Sessão deve ser positiva. As parcelas anterior e posterior do Replay
+não podem ser negativas e sua soma deve ser maior que zero. O registro é atualizado
+no lugar; não é criado um registro por Usuário, Espaço ou Sessão.
 
 Os valores técnicos de status e tipos de evento permanecem estáveis para preservar
 compatibilidade com domínio, API e integrações.

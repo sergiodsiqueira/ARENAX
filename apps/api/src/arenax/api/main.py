@@ -50,6 +50,8 @@ from .schemas import (
     LoginResponse,
     NamedResourceRequest,
     NamedResourceResponse,
+    OperationalSettingsInput,
+    OperationalSettingsResponse,
     ResetUserPasswordRequest,
     SessionResponse,
     SpaceResponse,
@@ -227,6 +229,23 @@ async def reset_user_password(
     user_id: UUID, request: ResetUserPasswordRequest, user: AdministratorUser
 ):
     await user_administration.reset_password(user, user_id, request.password, datetime.now(UTC))
+
+
+@app.get("/api/v1/settings", response_model=OperationalSettingsResponse)
+async def get_operational_settings(_user: AdministratorUser):
+    return await infrastructure.get_operational_settings()
+
+
+@app.put("/api/v1/settings", response_model=OperationalSettingsResponse)
+async def update_operational_settings(
+    request: OperationalSettingsInput, _user: AdministratorUser
+):
+    return await infrastructure.update_operational_settings(
+        request.default_session_duration_minutes,
+        request.replay_pre_duration_seconds,
+        request.replay_post_duration_seconds,
+        datetime.now(UTC),
+    )
 
 
 @app.post("/api/v1/clients", response_model=CreatedResourceResponse, status_code=201)

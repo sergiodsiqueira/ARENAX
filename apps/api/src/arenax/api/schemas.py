@@ -138,3 +138,13 @@ class CameraHealthResponse(BaseModel):
 
 class CameraLiveResponse(BaseModel):
     url: str
+
+
+class OperationalSettingsInput(BaseModel):
+    default_session_duration_minutes: int = Field(gt=0)
+    replay_pre_duration_seconds: int = Field(ge=0)
+    replay_post_duration_seconds: int = Field(ge=0)
+
+
+class OperationalSettingsResponse(OperationalSettingsInput):
+    updated_at: datetime

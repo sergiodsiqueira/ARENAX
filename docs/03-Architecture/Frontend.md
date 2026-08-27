@@ -14,6 +14,13 @@ operacional derivado da Sessão e pelo estado de indisponibilidade administrativ
 ## Administração
 Clientes, Espaços, Equipamentos, Arena Designer, Configurações, Relatórios e Health Center.
 
+### Configurações
+
+A primeira versão fica em `Administração > Configurações` e permite ajustar a
+duração padrão de uma Sessão e as durações anterior e posterior ao acionamento que
+formam a janela do Replay. A especificação da tela está em
+`docs/04-UX/Settings.md`.
+
 ### Padrão das telas de cadastro
 
 - Cabeçalho com a ação `Cadastrar` no canto superior direito.

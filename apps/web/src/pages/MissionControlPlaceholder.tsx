@@ -37,7 +37,7 @@ export function MissionControlPlaceholder() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [now, setNow] = useState(() => new Date());
-  const [spaceStatusFilter, setSpaceStatusFilter] = useState<SpaceStatusFilter>("all");
+  const [spaceStatusFilter, setSpaceStatusFilter] = useState<SpaceStatusFilter>("available");
   const [realTimeConnected, setRealTimeConnected] = useState(false);
   const day = useMemo(() => {
     const start = new Date(now); start.setHours(0, 0, 0, 0);

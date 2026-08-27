@@ -10,10 +10,11 @@ from arenax.domain.session import BLOCKING_STATUSES, Session, SessionStatus
 from .database import session_factory
 from .models import (
     AccessModel,
+    ClientModel,
     EquipmentModel,
     MomentModel,
+    OperationalSettingsModel,
     OutboxModel,
-    ClientModel,
     PhysicalEventModel,
     SessionModel,
     SessionSpaceModel,
@@ -414,6 +415,30 @@ class SqlAlchemyUnitOfWork:
     async def get_moment_replay_path(self, moment_id: UUID) -> str | None:
         return await self.session.scalar(select(MomentModel.replay_path).where(MomentModel.id == moment_id))
 
+    async def get_operational_settings(self, *, lock: bool = False) -> dict:
+        query = select(OperationalSettingsModel).where(OperationalSettingsModel.id == 1)
+        model = await self.session.scalar(query.with_for_update() if lock else query)
+        if model is None:
+            raise RuntimeError("Configurações operacionais não foram inicializadas")
+        return self._settings_projection(model)
+
+    async def update_operational_settings(
+        self,
+        default_session_duration_minutes: int,
+        replay_pre_duration_seconds: int,
+        replay_post_duration_seconds: int,
+        now: datetime,
+    ) -> dict:
+        model = await self.session.get(OperationalSettingsModel, 1)
+        if model is None:
+            raise RuntimeError("Configurações operacionais não foram inicializadas")
+        model.default_session_duration_minutes = default_session_duration_minutes
+        model.replay_pre_duration_seconds = replay_pre_duration_seconds
+        model.replay_post_duration_seconds = replay_post_duration_seconds
+        model.updated_at = now
+        await self.session.flush()
+        return self._settings_projection(model)
+
     @staticmethod
     def _to_model(item: Session) -> SessionModel:
         return SessionModel(id=item.id, responsible_client_id=item.responsible_client_id,
@@ -451,4 +476,13 @@ class SqlAlchemyUnitOfWork:
             "external_id": model.external_id,
             "configuration": model.configuration,
             "administrative_status": model.administrative_status,
+        }
+
+    @staticmethod
+    def _settings_projection(model: OperationalSettingsModel) -> dict:
+        return {
+            "default_session_duration_minutes": model.default_session_duration_minutes,
+            "replay_pre_duration_seconds": model.replay_pre_duration_seconds,
+            "replay_post_duration_seconds": model.replay_post_duration_seconds,
+            "updated_at": model.updated_at,
         }

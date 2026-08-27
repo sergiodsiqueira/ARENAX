@@ -174,3 +174,21 @@ export function createSession(input: { responsible_client_id: string; space_ids:
 }
 
 export const replayUrl = (momentId: string) => `${API_URL}/api/v1/moments/${momentId}/replay`;
+
+export type OperationalSettings = {
+  default_session_duration_minutes: number;
+  replay_pre_duration_seconds: number;
+  replay_post_duration_seconds: number;
+  updated_at: string;
+};
+
+export type OperationalSettingsInput = Omit<OperationalSettings, "updated_at">;
+
+export const getOperationalSettings = () =>
+  apiRequest<OperationalSettings>("/api/v1/settings");
+
+export const updateOperationalSettings = (input: OperationalSettingsInput) =>
+  apiRequest<OperationalSettings>("/api/v1/settings", {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });

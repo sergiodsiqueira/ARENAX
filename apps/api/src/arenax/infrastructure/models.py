@@ -7,6 +7,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Integer,
     String,
     UniqueConstraint,
 )
@@ -16,6 +17,42 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 class Base(DeclarativeBase):
     pass
+
+
+class OperationalSettingsModel(Base):
+    __tablename__ = "configuracoes"
+    __table_args__ = (
+        CheckConstraint("id = 1", name="ck_configuracoes_registro_unico"),
+        CheckConstraint(
+            "duracao_padrao_sessao_minutos > 0",
+            name="ck_configuracoes_duracao_sessao_positiva",
+        ),
+        CheckConstraint(
+            "duracao_replay_anterior_segundos >= 0",
+            name="ck_configuracoes_replay_anterior_nao_negativa",
+        ),
+        CheckConstraint(
+            "duracao_replay_posterior_segundos >= 0",
+            name="ck_configuracoes_replay_posterior_nao_negativa",
+        ),
+        CheckConstraint(
+            "duracao_replay_anterior_segundos + duracao_replay_posterior_segundos > 0",
+            name="ck_configuracoes_duracao_replay_positiva",
+        ),
+    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    default_session_duration_minutes: Mapped[int] = mapped_column(
+        "duracao_padrao_sessao_minutos", Integer
+    )
+    replay_pre_duration_seconds: Mapped[int] = mapped_column(
+        "duracao_replay_anterior_segundos", Integer
+    )
+    replay_post_duration_seconds: Mapped[int] = mapped_column(
+        "duracao_replay_posterior_segundos", Integer
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        "atualizado_em", DateTime(timezone=True)
+    )
 
 
 class ClientModel(Base):

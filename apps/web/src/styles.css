@@ -125,8 +125,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .logo-mark-dark span { border-color: #0f172a; }
 .sidebar-logotype {
   display: block;
-  width: 210px;
-  height: 158px;
+  width: 190px;
+  height: 112px;
   background-image: url("/branding/LOGOTIPO.png");
   background-repeat: no-repeat;
   background-position: center;
@@ -189,6 +189,6 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .operation-button-primary:hover { border-color: #066442; background: #066442; }
 .operation-button-danger { border-color: transparent; background: transparent; color: #be123c; }
 .operation-button-danger:hover { border-color: #fecdd3; background: #fff1f2; }
-.sidebar-link { display: flex; align-items: center; gap: .75rem; border-radius: 999px; padding: .72rem .9rem; color: var(--muted-foreground); font-size: .875rem; font-weight: 500; text-decoration: none; transition: 150ms; }
+.sidebar-link { display: flex; min-height: 40px; align-items: center; gap: .75rem; border-radius: 999px; padding: .55rem .9rem; color: var(--muted-foreground); font-size: .875rem; font-weight: 500; text-decoration: none; transition: 150ms; }
 .sidebar-link:hover { background: var(--accent); color: var(--primary); }
 .sidebar-link-active { background: var(--primary); color: var(--primary-foreground); box-shadow: 0 5px 14px rgba(40,95,85,.12); }

@@ -1,4 +1,4 @@
-import { CalendarDays, Cpu, LayoutDashboard, LogOut, MapPin, Menu, ShieldCheck, Users, X } from "lucide-react";
+import { CalendarDays, Cpu, LayoutDashboard, LogOut, MapPin, Menu, Settings, ShieldCheck, Users, X } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
@@ -24,23 +24,23 @@ export function AppShell({ user, children }: AppShellProps) {
   };
 
   const sidebar = <>
-    <div className="flex min-h-44 items-center justify-between px-5">
+    <div className="flex h-32 shrink-0 items-center justify-between px-5">
       <NavLink className="flex items-center gap-3" to="/mission-control" onClick={() => setOpen(false)} aria-label="ARENAX">
         <span className="sidebar-logotype" role="img" aria-label="ARENAX Smart Arena Management" />
       </NavLink>
       <button className="rounded-lg p-2 text-muted-foreground hover:bg-accent lg:hidden" onClick={() => setOpen(false)} aria-label="Fechar menu"><X size={20} /></button>
     </div>
-    <nav className="flex flex-1 flex-col p-4" aria-label="Navegação principal">
-      <p className="px-3 pb-2 pt-3 text-[.68rem] font-semibold tracking-[.16em] text-muted-foreground uppercase">Operação</p>
+    <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-2" aria-label="Navegação principal">
+      <p className="px-3 pb-1 pt-1 text-[.68rem] font-semibold tracking-[.16em] text-muted-foreground uppercase">Operação</p>
       <NavLink className={({ isActive }) => `sidebar-link ${isActive ? "sidebar-link-active" : ""}`} to="/mission-control" onClick={() => setOpen(false)}><LayoutDashboard size={19} /> Mission Control</NavLink>
       <NavLink className={({ isActive }) => `sidebar-link ${isActive ? "sidebar-link-active" : ""}`} to="/agenda" onClick={() => setOpen(false)}><CalendarDays size={19} /> Agenda</NavLink>
-      <p className="px-3 pb-2 pt-7 text-[.68rem] font-semibold tracking-[.16em] text-muted-foreground uppercase">Cadastros</p>
+      <p className="px-3 pb-1 pt-4 text-[.68rem] font-semibold tracking-[.16em] text-muted-foreground uppercase">Cadastros</p>
       <NavLink className={({ isActive }) => `sidebar-link ${isActive ? "sidebar-link-active" : ""}`} to="/cadastros/clientes" onClick={() => setOpen(false)}><Users size={19} /> Clientes</NavLink>
       <NavLink className={({ isActive }) => `sidebar-link ${isActive ? "sidebar-link-active" : ""}`} to="/cadastros/espacos" onClick={() => setOpen(false)}><MapPin size={19} /> Espaços</NavLink>
-      {user?.role !== "operador" && <><p className="px-3 pb-2 pt-7 text-[.68rem] font-semibold tracking-[.16em] text-muted-foreground uppercase">Administração</p><NavLink className={({ isActive }) => `sidebar-link ${isActive ? "sidebar-link-active" : ""}`} to="/administracao/equipamentos" onClick={() => setOpen(false)}><Cpu size={19} /> Equipamentos</NavLink><NavLink className={({ isActive }) => `sidebar-link ${isActive ? "sidebar-link-active" : ""}`} to="/administracao/acessos" onClick={() => setOpen(false)}><ShieldCheck size={19} /> Acessos</NavLink></>}
+      {user?.role !== "operador" && <><p className="px-3 pb-1 pt-4 text-[.68rem] font-semibold tracking-[.16em] text-muted-foreground uppercase">Administração</p><NavLink className={({ isActive }) => `sidebar-link ${isActive ? "sidebar-link-active" : ""}`} to="/administracao/equipamentos" onClick={() => setOpen(false)}><Cpu size={19} /> Equipamentos</NavLink><NavLink className={({ isActive }) => `sidebar-link ${isActive ? "sidebar-link-active" : ""}`} to="/administracao/acessos" onClick={() => setOpen(false)}><ShieldCheck size={19} /> Acessos</NavLink><NavLink className={({ isActive }) => `sidebar-link ${isActive ? "sidebar-link-active" : ""}`} to="/administracao/configuracoes" onClick={() => setOpen(false)}><Settings size={19} /> Configurações</NavLink></>}
     </nav>
-    <div className="border-t border-border p-4">
-      <div className="mb-3 px-3"><p className="truncate text-sm font-semibold text-foreground">{user?.name ?? "Carregando..."}</p><p className="mt-1 text-xs capitalize text-muted-foreground">{user?.role}</p></div>
+    <div className="shrink-0 border-t border-border p-3">
+      <div className="mb-2 px-3"><p className="truncate text-sm font-semibold text-foreground">{user?.name ?? "Carregando..."}</p><p className="mt-1 text-xs capitalize text-muted-foreground">{user?.role}</p></div>
       <button className="sidebar-link w-full" onClick={leave}><LogOut size={18} /> Sair</button>
     </div>
   </>;
