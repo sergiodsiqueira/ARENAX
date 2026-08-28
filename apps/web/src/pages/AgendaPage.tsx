@@ -11,7 +11,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { toast } from "sonner";
 import { AppShell } from "../components/AppShell";
 import { DatePicker } from "../components/ui/date-picker";
@@ -82,8 +82,14 @@ function initialPeriodForDay(day: string) {
 
 export function AgendaPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
-  const [day, setDay] = useState(() => dateInput(new Date()));
+  const [day, setDay] = useState(() => {
+    const requestedDay = searchParams.get("date");
+    return requestedDay && /^\d{4}-\d{2}-\d{2}$/.test(requestedDay)
+      ? requestedDay
+      : dateInput(new Date());
+  });
   const [creating, setCreating] = useState(false);
   const [responsibleId, setResponsibleId] = useState("");
   const [spaceIds, setSpaceIds] = useState<string[]>([]);
@@ -303,6 +309,7 @@ export function AgendaPage() {
                 transition.mutate({ id: session.id, action })
               }
               pending={transition.isPending}
+              agendaDate={day}
             />
           ))}
         </section>
@@ -402,12 +409,14 @@ function SessionCard({
   spaces,
   onAction,
   pending,
+  agendaDate,
 }: {
   session: ArenaSession;
   clientName: string;
   spaces: string[];
   onAction: (action: "confirm" | "start" | "cancel" | "no_show") => void;
   pending: boolean;
+  agendaDate: string;
 }) {
   const time = (value: string) =>
     new Intl.DateTimeFormat("pt-BR", {
@@ -443,7 +452,10 @@ function SessionCard({
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link className="operation-button" to={`/sessoes/${session.id}`}>
+          <Link
+            className="operation-button"
+            to={`/sessoes/${session.id}?agendaDate=${encodeURIComponent(agendaDate)}`}
+          >
             Ver dossiê
           </Link>
           {session.status === "scheduled" && (

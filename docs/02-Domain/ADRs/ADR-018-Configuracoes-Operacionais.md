@@ -16,6 +16,9 @@ valores são globais para a única Arena atendida pelo MVP.
   com `30`.
 - A duração posterior ao acionamento do Replay é armazenada em segundos e começa
   com `5`.
+- `calcular_tempo_real` define a base temporal do cálculo financeiro automático e
+  começa como `true`. Quando ativo, usa o período real da Sessão; quando inativo,
+  usa o período previsto, conforme ADR-020.
 - A duração padrão da Sessão é uma sugestão para a criação. A Sessão continua
   persistindo `inicio_previsto` e `fim_previsto`, e o operador pode ajustar o
   período antes de salvar.
@@ -30,6 +33,8 @@ valores são globais para a única Arena atendida pelo MVP.
 ## Responsabilidades
 - A configuração de duração da Sessão pertence ao contexto de Operação.
 - A janela de Replay pertence ao contexto de Momentos / Replay.
+- A seleção da base temporal é administrada por Configurações e interpretada pelo
+  contexto Financeiro.
 - O módulo de Configurações administra os valores, mas não assume as invariantes
   da Sessão nem o processamento do Replay.
 

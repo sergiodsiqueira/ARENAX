@@ -56,6 +56,14 @@ não foram commitadas.
   independente da data selecionada.
 - Fundação do design system migrada para shadcn/ui com Tailwind 4, tokens visuais
   da ARENAX e componentes-base versionados no frontend.
+- Pagamentos manuais imutáveis associados à Sessão, com valor em centavos,
+  método, observação opcional, autoria, Timeline e apresentação no Dossiê.
+- Valor por minuto configurável no Espaço, fotografado na criação da Sessão e
+  usado pelo backend para calcular valor previsto, total pago e saldo no Dossiê.
+- Alteração manual e recálculo explícito do valor previsto no Dossiê, com auditoria
+  na Timeline e preservação obrigatória dos preços históricos da Sessão.
+- Configuração `calcular_tempo_real`, ativa por padrão, para escolher entre minutos
+  reais e período previsto no cálculo automático do valor da Sessão.
 
 ## Navegação atual
 
@@ -71,10 +79,10 @@ não foram commitadas.
 
 ## Validação mais recente
 
-- API: 46 testes aprovados no Docker.
+- API: 59 testes aprovados no Docker.
 - Frontend: ESLint aprovado.
 - Frontend: build de produção aprovado.
-- Migration atual do banco: `0005`.
+- Migration atual do banco: `0010`.
 - API em execução e saudável em `http://localhost:8000`.
 - Frontend local em `http://localhost:5173`.
 
@@ -89,7 +97,13 @@ não foram commitadas.
 
 ## Próximos passos sugeridos
 
-1. Implementar Compartilhamento de Replays por link seguro.
+1. Implementar o Health Center básico.
+2. Revisar os demais itens pendentes do MVP.
+3. Implementar o Compartilhamento de Replays como última entrega do MVP.
+
+O formato do Compartilhamento ainda será decidido. Não assumir, por enquanto,
+link público na internet, acesso restrito à rede local, armazenamento em nuvem ou
+modelo híbrido.
 
 ## Retomada
 

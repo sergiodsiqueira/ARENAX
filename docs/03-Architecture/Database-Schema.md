@@ -12,6 +12,7 @@ permanecer em inglês enquanto os contratos existentes estiverem em vigor.
 | `sessoes` | Agregado central da operação. |
 | `sessao_espacos` | Espaços utilizados por cada Sessão. |
 | `momentos` | Momentos solicitados durante uma Sessão. |
+| `pagamentos` | Registros manuais e imutáveis de valores recebidos por Sessão. |
 | `eventos_fisicos` | Auditoria dos acionamentos físicos recebidos. |
 | `linha_do_tempo` | Eventos operacionais de cada Sessão. |
 | `caixa_de_saida` | Entrega confiável dos pedidos de Replay. |
@@ -21,11 +22,16 @@ permanecer em inglês enquanto os contratos existentes estiverem em vigor.
 
 ## Colunas principais
 
-- `sessoes`: `responsavel_id`, `inicio_previsto`, `fim_previsto`, `inicio_real`, `fim_real`.
-- `espacos`: `nome`, `status_administrativo`.
+- `sessoes`: `responsavel_id`, `inicio_previsto`, `fim_previsto`, `inicio_real`,
+  `fim_real`, `valor_previsto_manual_centavos`.
+- `espacos`: `nome`, `status_administrativo`, `valor_minuto_centavos`.
+- `sessao_espacos`: `sessao_id`, `espaco_id`, `valor_minuto_centavos` como
+  fotografia do preço aplicado à Sessão.
 - `clientes`: `nome`, `status_administrativo`.
 - `equipamentos`: `espaco_id`, `tipo`, `identificador_externo`, `configuracao`, `status_administrativo`.
 - `momentos`: `sessao_id`, `espaco_id`, `ocorrido_em`, `caminho_replay`.
+- `pagamentos`: `sessao_id`, `valor_centavos`, `metodo`, `observacao`,
+  `registrado_em`, `registrado_por`.
 - `eventos_fisicos`: `dispositivo_id`, `ocorrido_em`, `chave_idempotencia`, `aceito`.
 - `linha_do_tempo`: `sessao_id`, `tipo`, `ocorrido_em`, `dados`.
 - `caixa_de_saida`: `tipo`, `agregado_id`, `dados`, `publicado_em`.
@@ -33,7 +39,7 @@ permanecer em inglês enquanto os contratos existentes estiverem em vigor.
 - `acessos`: `usuario_id`, `token_hash`, `criado_em`, `expira_em`, `revogado_em`.
 - `configuracoes`: `duracao_padrao_sessao_minutos`,
   `duracao_replay_anterior_segundos`, `duracao_replay_posterior_segundos`,
-  `atualizado_em`.
+  `calcular_tempo_real`, `atualizado_em`.
 
 ## Configurações iniciais
 
@@ -45,10 +51,16 @@ pela migration, com os valores:
 | `duracao_padrao_sessao_minutos` | `60` |
 | `duracao_replay_anterior_segundos` | `30` |
 | `duracao_replay_posterior_segundos` | `5` |
+| `calcular_tempo_real` | `true` |
 
 A duração da Sessão deve ser positiva. As parcelas anterior e posterior do Replay
 não podem ser negativas e sua soma deve ser maior que zero. O registro é atualizado
 no lugar; não é criado um registro por Usuário, Espaço ou Sessão.
+
+Quando `calcular_tempo_real` está ativo, o valor da Sessão usa o período real. Uma
+Sessão ainda não iniciada possui zero minutos reais; uma Sessão em andamento usa o
+instante atual; uma Sessão encerrada usa seu fim real. Quando desativado, usa o
+período previsto.
 
 Os valores técnicos de status e tipos de evento permanecem estáveis para preservar
 compatibilidade com domínio, API e integrações.

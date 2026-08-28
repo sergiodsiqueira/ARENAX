@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from arenax.application.auth import AuthenticationService, UserAdministrationService
 from arenax.application.use_cases import (
     ArenaInfrastructureService,
+    PaymentService,
     PhysicalEventService,
     SessionService,
 )
@@ -39,12 +40,15 @@ from .schemas import (
     ButtonPressedResponse,
     CameraHealthResponse,
     CameraLiveResponse,
+    ChangeExpectedAmountRequest,
     ClientResponse,
     CreatedResourceResponse,
     CreateSessionRequest,
+    CreateSpaceRequest,
     CreateUserRequest,
     EquipmentRequest,
     EquipmentResponse,
+    ExpectedAmountResponse,
     ExtendSessionRequest,
     LoginRequest,
     LoginResponse,
@@ -52,6 +56,8 @@ from .schemas import (
     NamedResourceResponse,
     OperationalSettingsInput,
     OperationalSettingsResponse,
+    PaymentResponse,
+    RegisterPaymentRequest,
     ResetUserPasswordRequest,
     SessionResponse,
     SpaceResponse,
@@ -71,6 +77,7 @@ app.add_middleware(
 )
 sessions = SessionService(SqlAlchemyUnitOfWork)
 physical_events = PhysicalEventService(SqlAlchemyUnitOfWork)
+payments = PaymentService(SqlAlchemyUnitOfWork)
 infrastructure = ArenaInfrastructureService(SqlAlchemyUnitOfWork)
 password_hasher = Argon2PasswordHasher()
 authentication = AuthenticationService(
@@ -244,6 +251,7 @@ async def update_operational_settings(
         request.default_session_duration_minutes,
         request.replay_pre_duration_seconds,
         request.replay_post_duration_seconds,
+        request.calculate_actual_time,
         datetime.now(UTC),
     )
 
@@ -287,9 +295,9 @@ async def list_people_compatibility(_user: AuthenticatedUser):
 
 @app.post("/api/v1/spaces", response_model=CreatedResourceResponse, status_code=201)
 async def create_space(
-    request: NamedResourceRequest, _user: AdministratorUser
+    request: CreateSpaceRequest, _user: AdministratorUser
 ):
-    space_id = await infrastructure.create_space(request.name)
+    space_id = await infrastructure.create_space(request.name, request.minute_rate_cents)
     operational_events.publish("spaces", space_id)
     return {"id": space_id}
 
@@ -301,7 +309,9 @@ async def list_spaces(_user: AuthenticatedUser):
 
 @app.put("/api/v1/spaces/{space_id}", response_model=SpaceResponse)
 async def update_space(space_id: UUID, request: UpdateSpaceRequest, _user: AdministratorUser):
-    result = await infrastructure.update_space(space_id, request.name, request.administrative_status)
+    result = await infrastructure.update_space(
+        space_id, request.name, request.administrative_status, request.minute_rate_cents
+    )
     operational_events.publish("spaces", space_id)
     return result
 
@@ -440,7 +450,57 @@ async def get_in_progress_sessions(_user: AuthenticatedUser):
 async def get_session_dossier(
     session_id: UUID, _user: AuthenticatedUser
 ):
-    return await sessions.dossier(session_id)
+    return await sessions.dossier(session_id, datetime.now(UTC))
+
+
+@app.post(
+    "/api/v1/sessions/{session_id}/payments",
+    response_model=PaymentResponse,
+    status_code=201,
+)
+async def register_payment(
+    session_id: UUID,
+    request: RegisterPaymentRequest,
+    user: AuthenticatedUser,
+):
+    result = await payments.register(
+        session_id,
+        request.amount_cents,
+        request.method,
+        request.note,
+        user.id,
+        datetime.now(UTC),
+    )
+    operational_events.publish("sessions", session_id)
+    return result
+
+
+@app.put(
+    "/api/v1/sessions/{session_id}/expected-amount",
+    response_model=ExpectedAmountResponse,
+)
+async def change_expected_amount(
+    session_id: UUID,
+    request: ChangeExpectedAmountRequest,
+    user: AuthenticatedUser,
+):
+    amount = await payments.change_expected_amount(
+        session_id, request.amount_cents, user.id, datetime.now(UTC)
+    )
+    operational_events.publish("sessions", session_id)
+    return {"amount_cents": amount}
+
+
+@app.post(
+    "/api/v1/sessions/{session_id}/expected-amount/recalculate",
+    response_model=ExpectedAmountResponse,
+)
+async def recalculate_expected_amount(session_id: UUID, user: AuthenticatedUser):
+    amount = await payments.recalculate_expected_amount(
+        session_id, user.id, datetime.now(UTC)
+    )
+    operational_events.publish("sessions", session_id)
+    return {"amount_cents": amount}
 
 
 @app.post("/api/v1/sessions/{session_id}/actions/{action}", response_model=SessionResponse | None)

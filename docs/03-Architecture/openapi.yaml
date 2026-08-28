@@ -131,7 +131,7 @@ paths:
           content: {application/json: {schema: {type: array, items: {$ref: '#/components/schemas/Space'}}}}
     post:
       operationId: createSpace
-      requestBody: {$ref: '#/components/requestBodies/NamedResource'}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CreateSpaceInput'}}}}
       responses: {'201': {$ref: '#/components/responses/Created'}}
   /api/v1/spaces/{spaceId}:
     put:
@@ -277,6 +277,34 @@ paths:
               required: [scheduled_end]
               properties: {scheduled_end: {type: string, format: date-time}}
       responses: {'200': {$ref: '#/components/responses/Session'}, '409': {$ref: '#/components/responses/Conflict'}}
+  /api/v1/sessions/{sessionId}/payments:
+    post:
+      operationId: registerPayment
+      summary: Register an immutable manual Payment for a Session.
+      parameters:
+        - {name: sessionId, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/RegisterPaymentInput'}}}
+      responses:
+        '201': {description: Payment registered, content: {application/json: {schema: {$ref: '#/components/schemas/Payment'}}}}
+        '404': {description: Session not found}
+        '422': {description: Invalid amount, method or note}
+  /api/v1/sessions/{sessionId}/expected-amount:
+    put:
+      operationId: changeExpectedAmount
+      parameters: [{name: sessionId, in: path, required: true, schema: {type: string, format: uuid}}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/ExpectedAmountInput'}}}}
+      responses:
+        '200': {description: Manual expected amount applied, content: {application/json: {schema: {$ref: '#/components/schemas/ExpectedAmount'}}}}
+        '404': {description: Session not found}
+  /api/v1/sessions/{sessionId}/expected-amount/recalculate:
+    post:
+      operationId: recalculateExpectedAmount
+      parameters: [{name: sessionId, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: Expected amount recalculated from the Session historical Space rates, content: {application/json: {schema: {$ref: '#/components/schemas/ExpectedAmount'}}}}
+        '404': {description: Session not found}
   /api/v1/events/button-pressed:
     post:
       security: []
@@ -388,14 +416,23 @@ components:
       allOf:
         - {$ref: '#/components/schemas/NamedResource'}
         - type: object
-          required: [administrative_status]
-          properties: {administrative_status: {type: string}}
+          required: [administrative_status, minute_rate_cents]
+          properties:
+            administrative_status: {type: string}
+            minute_rate_cents: {type: integer, minimum: 0}
+    CreateSpaceInput:
+      type: object
+      required: [name, minute_rate_cents]
+      properties:
+        name: {type: string, maxLength: 120}
+        minute_rate_cents: {type: integer, minimum: 0}
     SpaceInput:
       type: object
-      required: [name, administrative_status]
+      required: [name, administrative_status, minute_rate_cents]
       properties:
         name: {type: string, maxLength: 120}
         administrative_status: {type: string, enum: [active, maintenance, disabled]}
+        minute_rate_cents: {type: integer, minimum: 0}
     Equipment:
       allOf:
         - {$ref: '#/components/schemas/EquipmentInput'}
@@ -425,11 +462,12 @@ components:
       properties: {url: {type: string, format: uri}}
     OperationalSettingsInput:
       type: object
-      required: [default_session_duration_minutes, replay_pre_duration_seconds, replay_post_duration_seconds]
+      required: [default_session_duration_minutes, replay_pre_duration_seconds, replay_post_duration_seconds, calculate_actual_time]
       properties:
         default_session_duration_minutes: {type: integer, minimum: 1}
         replay_pre_duration_seconds: {type: integer, minimum: 0}
         replay_post_duration_seconds: {type: integer, minimum: 0}
+        calculate_actual_time: {type: boolean, default: true}
     OperationalSettings:
       allOf:
         - {$ref: '#/components/schemas/OperationalSettingsInput'}
@@ -457,10 +495,39 @@ components:
       allOf:
         - {$ref: '#/components/schemas/Session'}
         - type: object
-          required: [moments, timeline]
+          required: [expected_amount_cents, expected_amount_is_manual, calculate_actual_time, moments, payments, timeline]
           properties:
+            expected_amount_cents: {type: integer, minimum: 0}
+            expected_amount_is_manual: {type: boolean}
+            calculate_actual_time: {type: boolean}
             moments: {type: array, items: {$ref: '#/components/schemas/Moment'}}
+            payments: {type: array, items: {$ref: '#/components/schemas/Payment'}}
             timeline: {type: array, items: {$ref: '#/components/schemas/TimelineEntry'}}
+    RegisterPaymentInput:
+      type: object
+      required: [amount_cents, method]
+      properties:
+        amount_cents: {type: integer, minimum: 1}
+        method: {type: string, enum: [cash, pix, debit_card, credit_card, other]}
+        note: {type: [string, 'null'], maxLength: 500}
+    ExpectedAmountInput:
+      type: object
+      required: [amount_cents]
+      properties: {amount_cents: {type: integer, minimum: 0}}
+    ExpectedAmount:
+      type: object
+      required: [amount_cents]
+      properties: {amount_cents: {type: integer, minimum: 0}}
+    Payment:
+      allOf:
+        - {$ref: '#/components/schemas/RegisterPaymentInput'}
+        - type: object
+          required: [id, session_id, registered_at, registered_by]
+          properties:
+            id: {type: string, format: uuid}
+            session_id: {type: string, format: uuid}
+            registered_at: {type: string, format: date-time}
+            registered_by: {type: string, format: uuid}
     Moment:
       type: object
       required: [id, space_id, occurred_at, status]

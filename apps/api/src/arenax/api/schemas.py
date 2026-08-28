@@ -73,11 +73,17 @@ class UpdateClientRequest(NamedResourceRequest):
 
 class SpaceResponse(NamedResourceResponse):
     administrative_status: str
+    minute_rate_cents: int
+
+
+class CreateSpaceRequest(NamedResourceRequest):
+    minute_rate_cents: int = Field(ge=0)
 
 
 class UpdateSpaceRequest(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     administrative_status: Literal["active", "maintenance", "disabled"]
+    minute_rate_cents: int = Field(ge=0)
 
 
 class EquipmentResponse(BaseModel):
@@ -144,7 +150,33 @@ class OperationalSettingsInput(BaseModel):
     default_session_duration_minutes: int = Field(gt=0)
     replay_pre_duration_seconds: int = Field(ge=0)
     replay_post_duration_seconds: int = Field(ge=0)
+    calculate_actual_time: bool
 
 
 class OperationalSettingsResponse(OperationalSettingsInput):
     updated_at: datetime
+
+
+class RegisterPaymentRequest(BaseModel):
+    amount_cents: int = Field(gt=0)
+    method: Literal["cash", "pix", "debit_card", "credit_card", "other"]
+    note: str | None = Field(default=None, max_length=500)
+
+
+class PaymentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    session_id: UUID
+    amount_cents: int
+    method: str
+    note: str | None
+    registered_at: datetime
+    registered_by: UUID
+
+
+class ChangeExpectedAmountRequest(BaseModel):
+    amount_cents: int = Field(ge=0)
+
+
+class ExpectedAmountResponse(BaseModel):
+    amount_cents: int

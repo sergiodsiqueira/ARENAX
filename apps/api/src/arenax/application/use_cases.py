@@ -10,6 +10,7 @@ from arenax.domain.errors import (
     SpaceInUse,
 )
 from arenax.domain.moment import Moment
+from arenax.domain.payment import Payment, PaymentMethod
 from arenax.domain.session import Session
 
 
@@ -46,9 +47,9 @@ class SessionService:
             await uow.commit()
         return session
 
-    async def dossier(self, session_id: UUID) -> dict:
+    async def dossier(self, session_id: UUID, now: datetime) -> dict:
         async with self._uow_factory() as uow:
-            dossier = await uow.session_dossier(session_id)
+            dossier = await uow.session_dossier(session_id, now)
             if dossier is None:
                 raise EntityNotFound("Session not found")
             return dossier
@@ -140,6 +141,89 @@ class PhysicalEventService:
             return ButtonPressResult(True, "moment_requested", moment.id, session.id)
 
 
+class PaymentService:
+    def __init__(self, uow_factory):
+        self._uow_factory = uow_factory
+
+    async def register(
+        self,
+        session_id: UUID,
+        amount_cents: int,
+        method: str,
+        note: str | None,
+        registered_by: UUID,
+        now: datetime,
+    ) -> Payment:
+        try:
+            payment_method = PaymentMethod(method)
+        except ValueError as exc:
+            raise ValueError("Payment method is invalid") from exc
+        payment = Payment(
+            session_id=session_id,
+            amount_cents=amount_cents,
+            method=payment_method,
+            note=note,
+            registered_by=registered_by,
+            registered_at=now,
+        )
+        async with self._uow_factory() as uow:
+            if not await uow.get_session(session_id, lock=True):
+                raise EntityNotFound("Session not found")
+            await uow.add_payment(payment)
+            await uow.add_timeline(
+                session_id,
+                "PaymentRegistered",
+                now,
+                {"paymentId": str(payment.id), "amountCents": amount_cents},
+            )
+            await uow.commit()
+        return payment
+
+    async def change_expected_amount(
+        self, session_id: UUID, amount_cents: int, changed_by: UUID, now: datetime
+    ) -> int:
+        if isinstance(amount_cents, bool) or amount_cents < 0:
+            raise ValueError("Expected amount cannot be negative")
+        async with self._uow_factory() as uow:
+            if not await uow.get_session(session_id, lock=True):
+                raise EntityNotFound("Session not found")
+            previous = await uow.session_expected_amount(session_id, now)
+            await uow.set_expected_amount_override(session_id, amount_cents)
+            await uow.add_timeline(
+                session_id,
+                "ExpectedAmountChanged",
+                now,
+                {
+                    "previousAmountCents": previous,
+                    "amountCents": amount_cents,
+                    "changedBy": str(changed_by),
+                },
+            )
+            await uow.commit()
+        return amount_cents
+
+    async def recalculate_expected_amount(
+        self, session_id: UUID, changed_by: UUID, now: datetime
+    ) -> int:
+        async with self._uow_factory() as uow:
+            if not await uow.get_session(session_id, lock=True):
+                raise EntityNotFound("Session not found")
+            previous = await uow.session_expected_amount(session_id, now)
+            amount_cents = await uow.recalculate_session_expected_amount(session_id, now)
+            await uow.add_timeline(
+                session_id,
+                "ExpectedAmountRecalculated",
+                now,
+                {
+                    "previousAmountCents": previous,
+                    "amountCents": amount_cents,
+                    "changedBy": str(changed_by),
+                },
+            )
+            await uow.commit()
+        return amount_cents
+
+
 class ArenaInfrastructureService:
     def __init__(self, uow_factory):
         self._uow_factory = uow_factory
@@ -153,27 +237,39 @@ class ArenaInfrastructureService:
             await uow.commit()
             return entity_id
 
-    async def create_space(self, name: str) -> UUID:
+    async def create_space(self, name: str, minute_rate_cents: int = 0) -> UUID:
         name = name.strip()
         if not name:
             raise ValueError("Nome do Espaço é obrigatório")
+        self._validate_minute_rate(minute_rate_cents)
         async with self._uow_factory() as uow:
-            entity_id = await uow.add_space(name)
+            entity_id = await uow.add_space(name, minute_rate_cents)
             await uow.commit()
             return entity_id
 
-    async def update_space(self, space_id: UUID, name: str, administrative_status: str) -> dict:
+    async def update_space(
+        self, space_id: UUID, name: str, administrative_status: str,
+        minute_rate_cents: int = 0,
+    ) -> dict:
         name = name.strip()
         if not name:
             raise ValueError("Nome do Espaço é obrigatório")
         if administrative_status not in {"active", "maintenance", "disabled"}:
             raise ValueError("Estado administrativo do Espaço é inválido")
+        self._validate_minute_rate(minute_rate_cents)
         async with self._uow_factory() as uow:
             if not await uow.get_space(space_id, lock=True):
                 raise EntityNotFound("Espaço não encontrado")
-            space = await uow.update_space(space_id, name, administrative_status)
+            space = await uow.update_space(
+                space_id, name, administrative_status, minute_rate_cents
+            )
             await uow.commit()
             return space
+
+    @staticmethod
+    def _validate_minute_rate(minute_rate_cents: int) -> None:
+        if isinstance(minute_rate_cents, bool) or minute_rate_cents < 0:
+            raise ValueError("O valor por minuto do Espaço não pode ser negativo")
 
     async def delete_space(self, space_id: UUID) -> None:
         async with self._uow_factory() as uow:
@@ -273,6 +369,7 @@ class ArenaInfrastructureService:
         default_session_duration_minutes: int,
         replay_pre_duration_seconds: int,
         replay_post_duration_seconds: int,
+        calculate_actual_time: bool,
         now: datetime,
     ) -> dict:
         if default_session_duration_minutes <= 0:
@@ -287,6 +384,7 @@ class ArenaInfrastructureService:
                 default_session_duration_minutes,
                 replay_pre_duration_seconds,
                 replay_post_duration_seconds,
+                calculate_actual_time,
                 now,
             )
             await uow.commit()

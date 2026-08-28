@@ -1,7 +1,10 @@
 # Roadmap
 
 ## MVP — v1.0
-Clientes; Espaços; Equipamentos; Agenda; Sessões; Mission Control; Momentos/Replays; pagamento manual; compartilhamento por WhatsApp/e-mail; Health Center básico.
+Clientes; Espaços; Equipamentos; Agenda; Sessões; Mission Control; Momentos/Replays;
+pagamento manual; Health Center básico; e, como última entrega do MVP,
+Compartilhamento de Replays. O mecanismo de acesso do Compartilhamento será
+definido futuramente.
 
 ## v1.1
 Confirmações mais automatizadas; pesquisa global; Dashboard TV; atalhos.

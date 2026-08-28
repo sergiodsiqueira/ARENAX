@@ -5,6 +5,7 @@ from sqlalchemy import delete, func, or_, select, update
 
 from arenax.domain.identity import User, UserRole, UserStatus
 from arenax.domain.moment import Moment
+from arenax.domain.payment import Payment, calculate_session_amount_cents
 from arenax.domain.session import BLOCKING_STATUSES, Session, SessionStatus
 
 from .database import session_factory
@@ -15,6 +16,7 @@ from .models import (
     MomentModel,
     OperationalSettingsModel,
     OutboxModel,
+    PaymentModel,
     PhysicalEventModel,
     SessionModel,
     SessionSpaceModel,
@@ -66,8 +68,19 @@ class SqlAlchemyUnitOfWork:
 
     async def add_session(self, domain: Session) -> None:
         self.session.add(self._to_model(domain))
-        self.session.add_all(SessionSpaceModel(session_id=domain.id, space_id=item)
-                             for item in domain.space_ids)
+        rates = dict((await self.session.execute(
+            select(SpaceModel.id, SpaceModel.minute_rate_cents).where(
+                SpaceModel.id.in_(domain.space_ids)
+            )
+        )).all())
+        self.session.add_all(
+            SessionSpaceModel(
+                session_id=domain.id,
+                space_id=item,
+                minute_rate_cents=rates[item],
+            )
+            for item in domain.space_ids
+        )
 
     async def get_session(self, session_id: UUID, *, lock=False) -> Session | None:
         query = select(SessionModel).where(SessionModel.id == session_id)
@@ -145,6 +158,40 @@ class SqlAlchemyUnitOfWork:
     async def add_timeline(self, session_id, kind, at, data) -> None:
         self.session.add(TimelineModel(session_id=session_id, kind=kind, occurred_at=at, data=data))
 
+    async def add_payment(self, payment: Payment) -> None:
+        self.session.add(PaymentModel(
+            id=payment.id,
+            session_id=payment.session_id,
+            amount_cents=payment.amount_cents,
+            method=payment.method.value,
+            note=payment.note,
+            registered_at=payment.registered_at,
+            registered_by=payment.registered_by,
+        ))
+
+    async def session_expected_amount(self, session_id: UUID, now: datetime) -> int:
+        model = await self.session.get(SessionModel, session_id)
+        if model.expected_amount_override_cents is not None:
+            return model.expected_amount_override_cents
+        links = list(await self.session.scalars(
+            select(SessionSpaceModel).where(SessionSpaceModel.session_id == session_id)
+        ))
+        settings = await self.get_operational_settings()
+        return self._calculated_session_amount(model, links, settings, now)
+
+    async def set_expected_amount_override(self, session_id: UUID, amount_cents: int) -> None:
+        model = await self.session.get(SessionModel, session_id)
+        model.expected_amount_override_cents = amount_cents
+
+    async def recalculate_session_expected_amount(self, session_id: UUID, now: datetime) -> int:
+        model = await self.session.get(SessionModel, session_id)
+        links = list(await self.session.scalars(
+            select(SessionSpaceModel).where(SessionSpaceModel.session_id == session_id)
+        ))
+        model.expected_amount_override_cents = None
+        settings = await self.get_operational_settings()
+        return self._calculated_session_amount(model, links, settings, now)
+
     async def add_outbox(self, kind, aggregate_id, payload) -> None:
         self.session.add(OutboxModel(kind=kind, aggregate_id=aggregate_id, payload=payload))
 
@@ -157,8 +204,8 @@ class SqlAlchemyUnitOfWork:
         await self.session.flush()
         return model.id
 
-    async def add_space(self, name: str) -> UUID:
-        model = SpaceModel(name=name)
+    async def add_space(self, name: str, minute_rate_cents: int) -> UUID:
+        model = SpaceModel(name=name, minute_rate_cents=minute_rate_cents)
         self.session.add(model)
         await self.session.flush()
         return model.id
@@ -166,13 +213,16 @@ class SqlAlchemyUnitOfWork:
     async def get_space(self, space_id: UUID, *, lock: bool = False) -> dict | None:
         query = select(SpaceModel).where(SpaceModel.id == space_id)
         model = await self.session.scalar(query.with_for_update() if lock else query)
-        return {"id": model.id, "name": model.name, "administrative_status": model.administrative_status} if model else None
+        return self._space_projection(model) if model else None
 
-    async def update_space(self, space_id: UUID, name: str, administrative_status: str) -> dict:
+    async def update_space(
+        self, space_id: UUID, name: str, administrative_status: str, minute_rate_cents: int
+    ) -> dict:
         model = await self.session.get(SpaceModel, space_id)
         model.name, model.administrative_status = name, administrative_status
+        model.minute_rate_cents = minute_rate_cents
         await self.session.flush()
-        return {"id": model.id, "name": model.name, "administrative_status": model.administrative_status}
+        return self._space_projection(model)
 
     async def space_has_dependencies(self, space_id: UUID) -> bool:
         session_exists = await self.session.scalar(select(SessionSpaceModel.session_id).where(SessionSpaceModel.space_id == space_id).limit(1))
@@ -238,14 +288,7 @@ class SqlAlchemyUnitOfWork:
 
     async def list_spaces(self) -> list[dict]:
         models = list(await self.session.scalars(select(SpaceModel).order_by(SpaceModel.name)))
-        return [
-            {
-                "id": model.id,
-                "name": model.name,
-                "administrative_status": model.administrative_status,
-            }
-            for model in models
-        ]
+        return [self._space_projection(model) for model in models]
 
     async def list_equipments(self, space_id: UUID | None = None) -> list[dict]:
         query = select(EquipmentModel).order_by(EquipmentModel.kind, EquipmentModel.external_id)
@@ -254,24 +297,38 @@ class SqlAlchemyUnitOfWork:
         models = list(await self.session.scalars(query))
         return [self._equipment_projection(model) for model in models]
 
-    async def session_dossier(self, session_id: UUID) -> dict | None:
+    async def session_dossier(self, session_id: UUID, now: datetime) -> dict | None:
         model = await self.session.get(SessionModel, session_id)
         if not model:
             return None
-        spaces = list(await self.session.scalars(select(SessionSpaceModel.space_id).where(
+        session_spaces = list(await self.session.scalars(select(SessionSpaceModel).where(
             SessionSpaceModel.session_id == session_id)))
         moments = list(await self.session.scalars(select(MomentModel).where(
             MomentModel.session_id == session_id).order_by(MomentModel.occurred_at)))
+        payments = list(await self.session.scalars(select(PaymentModel).where(
+            PaymentModel.session_id == session_id).order_by(PaymentModel.registered_at)))
         timeline = list(await self.session.scalars(select(TimelineModel).where(
             TimelineModel.session_id == session_id).order_by(TimelineModel.occurred_at)))
+        settings = await self.get_operational_settings()
         return {
             "id": str(model.id), "responsible_client_id": str(model.responsible_client_id),
-            "space_ids": [str(item) for item in spaces], "status": model.status,
+            "space_ids": [str(item.space_id) for item in session_spaces], "status": model.status,
             "scheduled_start": model.scheduled_start, "scheduled_end": model.scheduled_end,
             "actual_start": model.actual_start, "actual_end": model.actual_end,
+            "expected_amount_cents": (
+                model.expected_amount_override_cents
+                if model.expected_amount_override_cents is not None
+                else self._calculated_session_amount(model, session_spaces, settings, now)
+            ),
+            "expected_amount_is_manual": model.expected_amount_override_cents is not None,
+            "calculate_actual_time": settings["calculate_actual_time"],
             "moments": [{"id": str(item.id), "space_id": str(item.space_id),
                          "occurred_at": item.occurred_at, "status": item.status,
                          "replay_path": item.replay_path} for item in moments],
+            "payments": [{"id": str(item.id), "amount_cents": item.amount_cents,
+                          "method": item.method, "note": item.note,
+                          "registered_at": item.registered_at,
+                          "registered_by": str(item.registered_by)} for item in payments],
             "timeline": [{"kind": item.kind, "occurred_at": item.occurred_at,
                           "data": item.data} for item in timeline],
         }
@@ -427,6 +484,7 @@ class SqlAlchemyUnitOfWork:
         default_session_duration_minutes: int,
         replay_pre_duration_seconds: int,
         replay_post_duration_seconds: int,
+        calculate_actual_time: bool,
         now: datetime,
     ) -> dict:
         model = await self.session.get(OperationalSettingsModel, 1)
@@ -435,9 +493,27 @@ class SqlAlchemyUnitOfWork:
         model.default_session_duration_minutes = default_session_duration_minutes
         model.replay_pre_duration_seconds = replay_pre_duration_seconds
         model.replay_post_duration_seconds = replay_post_duration_seconds
+        model.calculate_actual_time = calculate_actual_time
         model.updated_at = now
         await self.session.flush()
         return self._settings_projection(model)
+
+    @staticmethod
+    def _calculated_session_amount(
+        model: SessionModel,
+        links: list[SessionSpaceModel],
+        settings: dict,
+        now: datetime,
+    ) -> int:
+        return calculate_session_amount_cents(
+            model.scheduled_start,
+            model.scheduled_end,
+            model.actual_start,
+            model.actual_end,
+            now,
+            [item.minute_rate_cents for item in links],
+            settings["calculate_actual_time"],
+        )
 
     @staticmethod
     def _to_model(item: Session) -> SessionModel:
@@ -468,6 +544,15 @@ class SqlAlchemyUnitOfWork:
         )
 
     @staticmethod
+    def _space_projection(model: SpaceModel) -> dict:
+        return {
+            "id": model.id,
+            "name": model.name,
+            "administrative_status": model.administrative_status,
+            "minute_rate_cents": model.minute_rate_cents,
+        }
+
+    @staticmethod
     def _equipment_projection(model: EquipmentModel) -> dict:
         return {
             "id": model.id,
@@ -484,5 +569,6 @@ class SqlAlchemyUnitOfWork:
             "default_session_duration_minutes": model.default_session_duration_minutes,
             "replay_pre_duration_seconds": model.replay_pre_duration_seconds,
             "replay_post_duration_seconds": model.replay_post_duration_seconds,
+            "calculate_actual_time": model.calculate_actual_time,
             "updated_at": model.updated_at,
         }

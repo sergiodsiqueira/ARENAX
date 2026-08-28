@@ -5,6 +5,7 @@ import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { AppShell } from "../components/AppShell";
 import { Button } from "../components/ui/button";
+import { Checkbox } from "../components/ui/checkbox";
 import { Input } from "../components/ui/input";
 import { getCurrentUser, getOperationalSettings, updateOperationalSettings } from "../lib/api";
 
@@ -12,6 +13,7 @@ type FormValues = {
   sessionMinutes: string;
   replayPreSeconds: string;
   replayPostSeconds: string;
+  calculateActualTime: boolean;
 };
 
 export function SettingsPage() {
@@ -33,12 +35,14 @@ export function SettingsPage() {
     sessionMinutes: settings.data ? String(settings.data.default_session_duration_minutes) : "",
     replayPreSeconds: settings.data ? String(settings.data.replay_pre_duration_seconds) : "",
     replayPostSeconds: settings.data ? String(settings.data.replay_post_duration_seconds) : "",
+    calculateActualTime: settings.data?.calculate_actual_time ?? true,
   };
 
   const values = {
     sessionMinutes: Number(displayedForm.sessionMinutes),
     replayPreSeconds: Number(displayedForm.replayPreSeconds),
     replayPostSeconds: Number(displayedForm.replayPostSeconds),
+    calculateActualTime: displayedForm.calculateActualTime,
   };
   const valid = Number.isInteger(values.sessionMinutes) && values.sessionMinutes > 0
     && Number.isInteger(values.replayPreSeconds) && values.replayPreSeconds >= 0
@@ -48,6 +52,7 @@ export function SettingsPage() {
     values.sessionMinutes !== settings.data.default_session_duration_minutes
     || values.replayPreSeconds !== settings.data.replay_pre_duration_seconds
     || values.replayPostSeconds !== settings.data.replay_post_duration_seconds
+    || values.calculateActualTime !== settings.data.calculate_actual_time
   );
 
   useEffect(() => {
@@ -64,6 +69,7 @@ export function SettingsPage() {
       default_session_duration_minutes: values.sessionMinutes,
       replay_pre_duration_seconds: values.replayPreSeconds,
       replay_post_duration_seconds: values.replayPostSeconds,
+      calculate_actual_time: values.calculateActualTime,
     }),
     onSuccess: (result) => {
       queryClient.setQueryData(["operational-settings"], result);
@@ -98,6 +104,10 @@ export function SettingsPage() {
             <div className="relative mt-2 max-w-xs"><Input className="pr-20" type="number" min="1" step="1" value={displayedForm.sessionMinutes} onChange={(event) => setForm({ ...displayedForm, sessionMinutes: event.target.value })} aria-describedby="session-duration-help" required /><span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-slate-400">minutos</span></div>
           </label>
           <p id="session-duration-help" className="mt-2 text-xs text-slate-500">Preenche o horário final; o operador poderá ajustá-lo antes de salvar.</p>
+          <label className="mt-6 flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+            <Checkbox checked={displayedForm.calculateActualTime} onCheckedChange={(checked) => setForm({ ...displayedForm, calculateActualTime: checked === true })} />
+            <span><strong className="block text-slate-700">Calcular pelo tempo real de uso</strong><span className="mt-1 block text-xs font-normal text-slate-500">Ativado: usa os minutos entre início e fim reais. Desativado: usa o período previsto.</span></span>
+          </label>
         </section>
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <span className="inline-flex rounded-xl bg-emerald-50 p-2.5 text-emerald-700"><Video size={21} /></span>

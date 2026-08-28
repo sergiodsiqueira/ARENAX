@@ -16,12 +16,18 @@
 | P1 | Capture Service | Buffer contínuo. |
 | P1 | Replay Worker | Vídeo retroativo/posterior. |
 | P1 | Momento | Associar Replay à Sessão. |
-| P2 | Compartilhamento | WhatsApp/e-mail. |
-| P2 | Pagamento | Registro manual. |
+| P2 | Pagamento | Registro manual imutável por Sessão. **Implementado.** |
 | P2 | Health Center | Saúde de infraestrutura. |
 | P2 | Arena Designer | Editor visual. |
 | P2 | Configurações | Duração padrão de Sessão e janela anterior/posterior de Replay. |
+| P2 | Compartilhamento | Última entrega do MVP. Forma de acesso e exposição dos Replays será decidida futuramente. |
 | P3 | Dashboard TV | Visão ampliada. |
 
 ## Priorização
 Perguntar: a qual contexto pertence? relaciona-se a Sessão? melhora operação? é necessária ao MVP?
+
+## Decisão de sequenciamento
+O Compartilhamento de Replays, incluindo qualquer link acessível sem autenticação,
+fica como a última entrega do MVP. A arquitetura de acesso — rede local, internet,
+armazenamento em nuvem ou modelo híbrido — ainda não foi decidida e não deve ser
+presumida durante as entregas anteriores.

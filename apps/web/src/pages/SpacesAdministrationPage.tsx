@@ -24,6 +24,7 @@ export function SpacesAdministrationPage() {
   const [filter, setFilter] = useState<Filter>("active"),
     [modal, setModal] = useState<Space | "new" | null>(null),
     [name, setName] = useState(""),
+    [minuteRate, setMinuteRate] = useState(""),
     [status, setStatus] = useState("active");
   const user = useQuery({
       queryKey: ["current-user"],
@@ -38,10 +39,11 @@ export function SpacesAdministrationPage() {
   const save = useMutation({
     mutationFn: async () =>
       modal === "new"
-        ? createSpace(name.trim())
+        ? createSpace({ name: name.trim(), minute_rate_cents: parseCurrency(minuteRate) })
         : updateSpace(modal!.id, {
             name: name.trim(),
             administrative_status: status,
+            minute_rate_cents: parseCurrency(minuteRate),
           }),
     onSuccess: () => {
       setModal(null);
@@ -77,6 +79,7 @@ export function SpacesAdministrationPage() {
   const open = (x: Space | "new") => {
     setModal(x);
     setName(x === "new" ? "" : x.name);
+    setMinuteRate(x === "new" ? "" : (x.minute_rate_cents / 100).toFixed(2).replace(".", ","));
     setStatus(x === "new" ? "active" : x.administrative_status);
   };
   return (
@@ -131,6 +134,7 @@ export function SpacesAdministrationPage() {
               <MapPin className="text-emerald-700" />
               <div>
                 <p className="font-semibold">{x.name}</p>
+                <p className="text-sm text-slate-600">{formatCurrency(x.minute_rate_cents)} por minuto</p>
                 <p className="text-xs text-slate-400">
                   {x.administrative_status === "active"
                     ? "Ativo"
@@ -185,6 +189,17 @@ export function SpacesAdministrationPage() {
                 />
               </label>
               <label className="mt-4 block text-sm font-semibold">
+                Valor por minuto (R$)
+                <Input
+                  className="mt-2"
+                  value={minuteRate}
+                  onChange={(e) => setMinuteRate(e.target.value)}
+                  inputMode="decimal"
+                  placeholder="0,00"
+                  required
+                />
+              </label>
+              <label className="mt-4 block text-sm font-semibold">
                 Estado
                 <Combobox
                   value={status}
@@ -211,3 +226,11 @@ export function SpacesAdministrationPage() {
     </AppShell>
   );
 }
+
+const parseCurrency = (value: string) => {
+  const normalized = value.replace(/\s/g, "").replace(".", "").replace(",", ".");
+  const cents = Math.round(Number(normalized) * 100);
+  if (!Number.isFinite(cents) || cents < 0) throw new Error("Informe um valor por minuto válido.");
+  return cents;
+};
+const formatCurrency = (cents: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);

@@ -13,7 +13,7 @@ export type AuthenticatedUser = {
   role: "proprietario" | "administrador" | "operador";
 };
 
-export type Space = { id: string; name: string; administrative_status: string };
+export type Space = { id: string; name: string; administrative_status: string; minute_rate_cents: number };
 export type Client = { id: string; name: string; administrative_status: "active" | "inactive" };
 export type SessionStatus = "scheduled" | "confirmed" | "in_progress" | "finished" | "archived" | "cancelled" | "no_show";
 export type ArenaSession = {
@@ -105,8 +105,8 @@ export const getClients = () => apiRequest<Client[]>("/api/v1/clients");
 export const createClient = (name: string) => apiRequest<{ id: string }>("/api/v1/clients", { method: "POST", body: JSON.stringify({ name }) });
 export const updateClient = (clientId: string, input: Pick<Client, "name" | "administrative_status">) => apiRequest<Client>(`/api/v1/clients/${clientId}`, { method: "PUT", body: JSON.stringify(input) });
 export const deleteClient = (clientId: string) => apiRequest<void>(`/api/v1/clients/${clientId}`, { method: "DELETE" });
-export const createSpace = (name: string) => apiRequest<{ id: string }>("/api/v1/spaces", { method: "POST", body: JSON.stringify({ name }) });
-export const updateSpace = (spaceId: string, input: Pick<Space, "name" | "administrative_status">) => apiRequest<Space>(`/api/v1/spaces/${spaceId}`, { method: "PUT", body: JSON.stringify(input) });
+export const createSpace = (input: Pick<Space, "name" | "minute_rate_cents">) => apiRequest<{ id: string }>("/api/v1/spaces", { method: "POST", body: JSON.stringify(input) });
+export const updateSpace = (spaceId: string, input: Pick<Space, "name" | "administrative_status" | "minute_rate_cents">) => apiRequest<Space>(`/api/v1/spaces/${spaceId}`, { method: "PUT", body: JSON.stringify(input) });
 export const deleteSpace = (spaceId: string) => apiRequest<void>(`/api/v1/spaces/${spaceId}`, { method: "DELETE" });
 
 export function getSessions(start: Date, end: Date): Promise<ArenaSession[]> {
@@ -160,7 +160,16 @@ export type SessionMoment = {
   replay_path: string | null;
 };
 export type TimelineEntry = { kind: string; occurred_at: string; data: Record<string, unknown> };
-export type SessionDossier = ArenaSession & { moments: SessionMoment[]; timeline: TimelineEntry[] };
+export type PaymentMethod = "cash" | "pix" | "debit_card" | "credit_card" | "other";
+export type SessionPayment = {
+  id: string;
+  amount_cents: number;
+  method: PaymentMethod;
+  note: string | null;
+  registered_at: string;
+  registered_by: string;
+};
+export type SessionDossier = ArenaSession & { expected_amount_cents: number; expected_amount_is_manual: boolean; calculate_actual_time: boolean; moments: SessionMoment[]; payments: SessionPayment[]; timeline: TimelineEntry[] };
 
 export const getEquipments = (spaceId?: string) => apiRequest<Equipment[]>(`/api/v1/equipments${spaceId ? `?space_id=${spaceId}` : ""}`);
 export const createEquipment = (input: Omit<Equipment, "id">) => apiRequest<{ id: string }>("/api/v1/equipments", { method: "POST", body: JSON.stringify(input) });
@@ -168,6 +177,12 @@ export const updateEquipment = (equipmentId: string, input: Omit<Equipment, "id"
 export const deleteEquipment = (equipmentId: string) => apiRequest<void>(`/api/v1/equipments/${equipmentId}`, { method: "DELETE" });
 export const getCameraLive = (cameraId: string) => apiRequest<{ url: string }>(`/api/v1/cameras/${cameraId}/live`, { method: "POST" });
 export const getSessionDossier = (sessionId: string) => apiRequest<SessionDossier>(`/api/v1/sessions/${sessionId}`);
+export const registerPayment = (sessionId: string, input: { amount_cents: number; method: PaymentMethod; note?: string }) =>
+  apiRequest<SessionPayment>(`/api/v1/sessions/${sessionId}/payments`, { method: "POST", body: JSON.stringify(input) });
+export const changeExpectedAmount = (sessionId: string, amountCents: number) =>
+  apiRequest<{ amount_cents: number }>(`/api/v1/sessions/${sessionId}/expected-amount`, { method: "PUT", body: JSON.stringify({ amount_cents: amountCents }) });
+export const recalculateExpectedAmount = (sessionId: string) =>
+  apiRequest<{ amount_cents: number }>(`/api/v1/sessions/${sessionId}/expected-amount/recalculate`, { method: "POST" });
 
 export function createSession(input: { responsible_client_id: string; space_ids: string[]; scheduled_start: string; scheduled_end: string }) {
   return apiRequest<ArenaSession>("/api/v1/sessions", { method: "POST", body: JSON.stringify(input) });
@@ -179,6 +194,7 @@ export type OperationalSettings = {
   default_session_duration_minutes: number;
   replay_pre_duration_seconds: number;
   replay_post_duration_seconds: number;
+  calculate_actual_time: boolean;
   updated_at: string;
 };
 

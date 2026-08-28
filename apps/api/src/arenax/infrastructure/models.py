@@ -50,6 +50,9 @@ class OperationalSettingsModel(Base):
     replay_post_duration_seconds: Mapped[int] = mapped_column(
         "duracao_replay_posterior_segundos", Integer
     )
+    calculate_actual_time: Mapped[bool] = mapped_column(
+        "calcular_tempo_real", Boolean, default=True
+    )
     updated_at: Mapped[datetime] = mapped_column(
         "atualizado_em", DateTime(timezone=True)
     )
@@ -63,12 +66,16 @@ class ClientModel(Base):
 
 
 class SpaceModel(Base):
+    __table_args__ = (
+        CheckConstraint("valor_minuto_centavos >= 0", name="ck_espacos_valor_minuto_nao_negativo"),
+    )
     __tablename__ = "espacos"
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column("nome", String(120), unique=True)
     administrative_status: Mapped[str] = mapped_column(
         "status_administrativo", String(30), default="active"
     )
+    minute_rate_cents: Mapped[int] = mapped_column("valor_minuto_centavos", Integer, default=0)
 
 
 class EquipmentModel(Base):
@@ -96,16 +103,26 @@ class SessionModel(Base):
     )
     actual_start: Mapped[datetime | None] = mapped_column("inicio_real", DateTime(timezone=True))
     actual_end: Mapped[datetime | None] = mapped_column("fim_real", DateTime(timezone=True))
+    expected_amount_override_cents: Mapped[int | None] = mapped_column(
+        "valor_previsto_manual_centavos", Integer
+    )
 
 
 class SessionSpaceModel(Base):
     __tablename__ = "sessao_espacos"
+    __table_args__ = (
+        CheckConstraint(
+            "valor_minuto_centavos >= 0",
+            name="ck_sessao_espacos_valor_minuto_nao_negativo",
+        ),
+    )
     session_id: Mapped[UUID] = mapped_column(
         "sessao_id", ForeignKey("sessoes.id"), primary_key=True
     )
     space_id: Mapped[UUID] = mapped_column(
         "espaco_id", ForeignKey("espacos.id"), primary_key=True, index=True
     )
+    minute_rate_cents: Mapped[int] = mapped_column("valor_minuto_centavos", Integer, default=0)
 
 
 class PhysicalEventModel(Base):
@@ -126,6 +143,24 @@ class MomentModel(Base):
     occurred_at: Mapped[datetime] = mapped_column("ocorrido_em", DateTime(timezone=True))
     status: Mapped[str] = mapped_column(String(30))
     replay_path: Mapped[str | None] = mapped_column("caminho_replay", String(500))
+
+
+class PaymentModel(Base):
+    __tablename__ = "pagamentos"
+    __table_args__ = (
+        CheckConstraint("valor_centavos > 0", name="ck_pagamentos_valor_positivo"),
+        CheckConstraint(
+            "metodo IN ('cash', 'pix', 'debit_card', 'credit_card', 'other')",
+            name="ck_pagamentos_metodo",
+        ),
+    )
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True)
+    session_id: Mapped[UUID] = mapped_column("sessao_id", ForeignKey("sessoes.id"), index=True)
+    amount_cents: Mapped[int] = mapped_column("valor_centavos", Integer)
+    method: Mapped[str] = mapped_column("metodo", String(30))
+    note: Mapped[str | None] = mapped_column("observacao", String(500))
+    registered_at: Mapped[datetime] = mapped_column("registrado_em", DateTime(timezone=True), index=True)
+    registered_by: Mapped[UUID] = mapped_column("registrado_por", ForeignKey("usuarios.id"))
 
 
 class TimelineModel(Base):
