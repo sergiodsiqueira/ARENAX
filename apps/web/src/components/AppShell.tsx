@@ -1,4 +1,4 @@
-import { CalendarDays, Cpu, LayoutDashboard, LogOut, MapPin, Menu, Settings, ShieldCheck, Users, X } from "lucide-react";
+import { Activity, CalendarDays, Cpu, LayoutDashboard, LogOut, MapPin, Menu, Settings, ShieldUser, Users, X } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
@@ -34,10 +34,11 @@ export function AppShell({ user, children }: AppShellProps) {
       <p className="px-3 pb-1 pt-1 text-[.68rem] font-semibold tracking-[.16em] text-muted-foreground uppercase">Operação</p>
       <NavLink className={({ isActive }) => `sidebar-link ${isActive ? "sidebar-link-active" : ""}`} to="/mission-control" onClick={() => setOpen(false)}><LayoutDashboard size={19} /> Mission Control</NavLink>
       <NavLink className={({ isActive }) => `sidebar-link ${isActive ? "sidebar-link-active" : ""}`} to="/agenda" onClick={() => setOpen(false)}><CalendarDays size={19} /> Agenda</NavLink>
+      <NavLink className={({ isActive }) => `sidebar-link ${isActive ? "sidebar-link-active" : ""}`} to="/health-center" onClick={() => setOpen(false)}><Activity size={19} /> Health Center</NavLink>
       <p className="px-3 pb-1 pt-4 text-[.68rem] font-semibold tracking-[.16em] text-muted-foreground uppercase">Cadastros</p>
       <NavLink className={({ isActive }) => `sidebar-link ${isActive ? "sidebar-link-active" : ""}`} to="/cadastros/clientes" onClick={() => setOpen(false)}><Users size={19} /> Clientes</NavLink>
       <NavLink className={({ isActive }) => `sidebar-link ${isActive ? "sidebar-link-active" : ""}`} to="/cadastros/espacos" onClick={() => setOpen(false)}><MapPin size={19} /> Espaços</NavLink>
-      {user?.role !== "operador" && <><p className="px-3 pb-1 pt-4 text-[.68rem] font-semibold tracking-[.16em] text-muted-foreground uppercase">Administração</p><NavLink className={({ isActive }) => `sidebar-link ${isActive ? "sidebar-link-active" : ""}`} to="/administracao/equipamentos" onClick={() => setOpen(false)}><Cpu size={19} /> Equipamentos</NavLink><NavLink className={({ isActive }) => `sidebar-link ${isActive ? "sidebar-link-active" : ""}`} to="/administracao/acessos" onClick={() => setOpen(false)}><ShieldCheck size={19} /> Acessos</NavLink><NavLink className={({ isActive }) => `sidebar-link ${isActive ? "sidebar-link-active" : ""}`} to="/administracao/configuracoes" onClick={() => setOpen(false)}><Settings size={19} /> Configurações</NavLink></>}
+      {user?.role !== "operador" && <><p className="px-3 pb-1 pt-4 text-[.68rem] font-semibold tracking-[.16em] text-muted-foreground uppercase">Administração</p><NavLink className={({ isActive }) => `sidebar-link ${isActive ? "sidebar-link-active" : ""}`} to="/administracao/equipamentos" onClick={() => setOpen(false)}><Cpu size={19} /> Equipamentos</NavLink><NavLink className={({ isActive }) => `sidebar-link ${isActive ? "sidebar-link-active" : ""}`} to="/administracao/acessos" onClick={() => setOpen(false)}><ShieldUser size={19} /> Acessos</NavLink><NavLink className={({ isActive }) => `sidebar-link ${isActive ? "sidebar-link-active" : ""}`} to="/administracao/configuracoes" onClick={() => setOpen(false)}><Settings size={19} /> Configurações</NavLink></>}
     </nav>
     <div className="shrink-0 border-t border-border p-3">
       <div className="mb-2 px-3"><p className="truncate text-sm font-semibold text-foreground">{user?.name ?? "Carregando..."}</p><p className="mt-1 text-xs capitalize text-muted-foreground">{user?.role}</p></div>

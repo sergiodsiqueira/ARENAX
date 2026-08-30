@@ -3,11 +3,11 @@
 ## MVP — v1.0
 Clientes; Espaços; Equipamentos; Agenda; Sessões; Mission Control; Momentos/Replays;
 pagamento manual; Health Center básico; e, como última entrega do MVP,
-Compartilhamento de Replays. O mecanismo de acesso do Compartilhamento será
-definido futuramente.
+Compartilhamento local e autenticado de Replays, sem link público ou dependência
+de nuvem.
 
 ## v1.1
-Confirmações mais automatizadas; pesquisa global; Dashboard TV; atalhos.
+Arena Designer; confirmações mais automatizadas; pesquisa global; Dashboard TV; atalhos.
 
 ## v1.2
 Autoatendimento; QR Code da Sessão; pagamento online; experiência do cliente.

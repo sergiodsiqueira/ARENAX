@@ -14,7 +14,21 @@ export type AuthenticatedUser = {
 };
 
 export type Space = { id: string; name: string; administrative_status: string; minute_rate_cents: number };
-export type Client = { id: string; name: string; administrative_status: "active" | "inactive" };
+export type Client = {
+  id: string;
+  name: string;
+  client_type: "F" | "J";
+  document: string;
+  postal_code: string;
+  address: string;
+  city: string;
+  state: string;
+  notes: string;
+  phone: string;
+  email: string;
+  whatsapp: boolean;
+  administrative_status: "active" | "inactive";
+};
 export type SessionStatus = "scheduled" | "confirmed" | "in_progress" | "finished" | "archived" | "cancelled" | "no_show";
 export type ArenaSession = {
   id: string;
@@ -102,10 +116,10 @@ export async function getCurrentUser(): Promise<AuthenticatedUser> {
 
 export const getSpaces = () => apiRequest<Space[]>("/api/v1/spaces");
 export const getClients = () => apiRequest<Client[]>("/api/v1/clients");
-export const createClient = (name: string) => apiRequest<{ id: string }>("/api/v1/clients", { method: "POST", body: JSON.stringify({ name }) });
-export const updateClient = (clientId: string, input: Pick<Client, "name" | "administrative_status">) => apiRequest<Client>(`/api/v1/clients/${clientId}`, { method: "PUT", body: JSON.stringify(input) });
+export const createClient = (input: Omit<Client, "id">) => apiRequest<{ id: string }>("/api/v1/clients", { method: "POST", body: JSON.stringify(input) });
+export const updateClient = (clientId: string, input: Omit<Client, "id">) => apiRequest<Client>(`/api/v1/clients/${clientId}`, { method: "PUT", body: JSON.stringify(input) });
 export const deleteClient = (clientId: string) => apiRequest<void>(`/api/v1/clients/${clientId}`, { method: "DELETE" });
-export const createSpace = (input: Pick<Space, "name" | "minute_rate_cents">) => apiRequest<{ id: string }>("/api/v1/spaces", { method: "POST", body: JSON.stringify(input) });
+export const createSpace = (input: Pick<Space, "name" | "administrative_status" | "minute_rate_cents">) => apiRequest<{ id: string }>("/api/v1/spaces", { method: "POST", body: JSON.stringify(input) });
 export const updateSpace = (spaceId: string, input: Pick<Space, "name" | "administrative_status" | "minute_rate_cents">) => apiRequest<Space>(`/api/v1/spaces/${spaceId}`, { method: "PUT", body: JSON.stringify(input) });
 export const deleteSpace = (spaceId: string) => apiRequest<void>(`/api/v1/spaces/${spaceId}`, { method: "DELETE" });
 
@@ -190,15 +204,35 @@ export function createSession(input: { responsible_client_id: string; space_ids:
 
 export const replayUrl = (momentId: string) => `${API_URL}/api/v1/moments/${momentId}/replay`;
 
+export async function getReplayFile(momentId: string): Promise<File> {
+  const response = await fetch(replayUrl(momentId), { credentials: "include" });
+  if (!response.ok) throw new Error("Não foi possível carregar o Replay.");
+  const blob = await response.blob();
+  return new File([blob], `replay-${momentId}.mp4`, { type: blob.type || "video/mp4" });
+}
+
+export const registerReplayShare = (momentId: string) =>
+  apiRequest<void>(`/api/v1/moments/${momentId}/share`, { method: "POST" });
+
 export type OperationalSettings = {
   default_session_duration_minutes: number;
   replay_pre_duration_seconds: number;
   replay_post_duration_seconds: number;
   calculate_actual_time: boolean;
+  replay_retention_days: number | null;
+  company_tax_id: string;
+  company_legal_name: string;
+  company_trade_name: string;
+  company_address: string;
+  company_postal_code: string;
+  company_city: string;
+  company_state: string;
+  company_phone: string;
+  media_storage_path: string;
   updated_at: string;
 };
 
-export type OperationalSettingsInput = Omit<OperationalSettings, "updated_at">;
+export type OperationalSettingsInput = Omit<OperationalSettings, "updated_at" | "media_storage_path">;
 
 export const getOperationalSettings = () =>
   apiRequest<OperationalSettings>("/api/v1/settings");
@@ -208,3 +242,56 @@ export const updateOperationalSettings = (input: OperationalSettingsInput) =>
     method: "PUT",
     body: JSON.stringify(input),
   });
+
+export const selectReplayStorageFolder = () =>
+  apiRequest<{ path: string | null; cancelled: boolean }>("/api/v1/storage/select-folder", {
+    method: "POST",
+  });
+
+export const applyReplayStorageFolder = (path: string) =>
+  apiRequest<{ accepted: boolean; path: string }>("/api/v1/storage/apply", {
+    method: "POST",
+    body: JSON.stringify({ path }),
+  });
+
+export type PostalCodeResult = {
+  postal_code: string;
+  street: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+};
+
+export const lookupPostalCode = (postalCode: string) =>
+  apiRequest<PostalCodeResult>(`/api/v1/postal-codes/${encodeURIComponent(postalCode)}`);
+
+export type HealthStatus = "healthy" | "attention" | "critical" | "degraded" | "unavailable" | "unknown" | "inactive";
+export type HealthService = {
+  name: string;
+  label: string;
+  status: HealthStatus;
+  checked_at: string | null;
+  detail: string | null;
+  response_time_ms: number | null;
+  total_bytes: number | null;
+  free_bytes: number | null;
+  used_percent: number | null;
+};
+export type CameraHealthItem = {
+  camera_id: string;
+  external_id: string;
+  space_id: string;
+  space_name: string;
+  administrative_status: "active" | "inactive";
+  status: HealthStatus;
+  checked_at: string | null;
+  detail: string | null;
+};
+export type HealthCenter = {
+  status: "healthy" | "attention" | "critical";
+  checked_at: string;
+  services: HealthService[];
+  cameras: CameraHealthItem[];
+};
+
+export const getHealthCenter = () => apiRequest<HealthCenter>("/api/v1/health-center");

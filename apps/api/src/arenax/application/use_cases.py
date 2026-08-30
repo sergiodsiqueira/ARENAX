@@ -224,26 +224,70 @@ class PaymentService:
         return amount_cents
 
 
+class ReplaySharingService:
+    def __init__(self, uow_factory):
+        self._uow_factory = uow_factory
+
+    async def register_share(
+        self, moment_id: UUID, user_id: UUID, now: datetime
+    ) -> UUID:
+        async with self._uow_factory() as uow:
+            replay = await uow.get_moment_replay(moment_id, lock=True)
+            if replay is None or replay["status"] != "ready" or not replay["replay_path"]:
+                raise EntityNotFound("Replay não encontrado")
+            await uow.add_timeline(
+                replay["session_id"],
+                "ReplayShared",
+                now,
+                {"momentId": str(moment_id), "sharedBy": str(user_id)},
+            )
+            await uow.commit()
+            return replay["session_id"]
+
+
 class ArenaInfrastructureService:
     def __init__(self, uow_factory):
         self._uow_factory = uow_factory
 
-    async def create_client(self, name: str) -> UUID:
+    async def create_client(
+        self, name: str, client_type: str = "F", document: str = "",
+        postal_code: str = "", address: str = "", city: str = "", state: str = "",
+        notes: str = "", phone: str = "", email: str = "", whatsapp: bool = False,
+        administrative_status: str = "active",
+        *, allow_legacy_blank_document: bool = False,
+    ) -> UUID:
         name = name.strip()
         if not name:
             raise ValueError("Nome do Cliente é obrigatório")
+        document = self._validate_client_document(
+            client_type, document, required=False
+        )
+        postal_code, address, city, state = self._validate_client_address(
+            postal_code, address, city, state
+        )
+        notes = str(notes or "").strip()
+        phone, email, whatsapp = self._validate_client_contact(phone, email, whatsapp)
+        self._validate_binary_status(administrative_status, "Cliente")
         async with self._uow_factory() as uow:
-            entity_id = await uow.add_client(name)
+            entity_id = await uow.add_client(
+                name, client_type, document, postal_code, address, city, state,
+                notes, phone, email, whatsapp, administrative_status,
+            )
             await uow.commit()
             return entity_id
 
-    async def create_space(self, name: str, minute_rate_cents: int = 0) -> UUID:
+    async def create_space(
+        self, name: str, minute_rate_cents: int = 0,
+        administrative_status: str = "active",
+    ) -> UUID:
         name = name.strip()
         if not name:
             raise ValueError("Nome do Espaço é obrigatório")
         self._validate_minute_rate(minute_rate_cents)
+        if administrative_status not in {"active", "disabled"}:
+            raise ValueError("Estado administrativo do Espaço é inválido")
         async with self._uow_factory() as uow:
-            entity_id = await uow.add_space(name, minute_rate_cents)
+            entity_id = await uow.add_space(name, minute_rate_cents, administrative_status)
             await uow.commit()
             return entity_id
 
@@ -331,17 +375,80 @@ class ArenaInfrastructureService:
         async with self._uow_factory() as uow:
             return await uow.list_clients()
 
-    async def update_client(self, client_id: UUID, name: str, administrative_status: str = "active") -> dict:
+    async def update_client(
+        self, client_id: UUID, name: str, client_type: str = "F",
+        document: str = "", postal_code: str = "", address: str = "",
+        city: str = "", state: str = "", notes: str = "",
+        phone: str = "", email: str = "", whatsapp: bool = False,
+        administrative_status: str = "active",
+    ) -> dict:
         name = name.strip()
         if not name:
             raise ValueError("Nome do Cliente é obrigatório")
+        document = self._validate_client_document(client_type, document, required=False)
+        postal_code, address, city, state = self._validate_client_address(
+            postal_code, address, city, state
+        )
         self._validate_binary_status(administrative_status, "Cliente")
+        notes = str(notes or "").strip()
+        phone, email, whatsapp = self._validate_client_contact(phone, email, whatsapp)
         async with self._uow_factory() as uow:
             if not await uow.get_client(client_id, lock=True):
                 raise EntityNotFound("Cliente não encontrado")
-            client = await uow.update_client(client_id, name, administrative_status)
+            client = await uow.update_client(
+                client_id, name, client_type, document, postal_code, address,
+                city, state, notes, phone, email, whatsapp, administrative_status
+            )
             await uow.commit()
             return client
+
+    @staticmethod
+    def _validate_client_document(
+        client_type: str, document: str, *, required: bool
+    ) -> str:
+        if client_type not in {"F", "J"}:
+            raise ValueError("Tipo do Cliente deve ser F ou J")
+        normalized = "".join(
+            character for character in str(document or "").upper()
+            if character.isalnum() and character.isascii()
+        )
+        if not normalized and not required:
+            return ""
+        if client_type == "F" and (len(normalized) != 11 or not normalized.isdigit()):
+            raise ValueError("CPF deve ter 11 dígitos")
+        if client_type == "J" and (
+            len(normalized) != 14
+            or not normalized[:12].isalnum()
+            or not normalized[-2:].isdigit()
+        ):
+            raise ValueError(
+                "CNPJ deve ter 12 letras ou números e 2 dígitos verificadores"
+            )
+        return normalized
+
+    @staticmethod
+    def _validate_client_address(
+        postal_code: str, address: str, city: str, state: str
+    ) -> tuple[str, str, str, str]:
+        postal_code = "".join(character for character in postal_code if character.isdigit())
+        address, city, state = address.strip(), city.strip(), state.strip().upper()
+        if postal_code and len(postal_code) != 8:
+            raise ValueError("CEP deve ter 8 dígitos")
+        if state and (len(state) != 2 or not state.isalpha()):
+            raise ValueError("UF deve ter 2 letras")
+        return postal_code, address, city, state
+
+    @staticmethod
+    def _validate_client_contact(phone: str, email: str, whatsapp: bool) -> tuple[str, str, bool]:
+        phone = "".join(character for character in str(phone or "") if character.isdigit())
+        email = str(email or "").strip().lower()
+        if phone and len(phone) not in {10, 11}:
+            raise ValueError("Telefone deve ter 10 ou 11 dígitos")
+        if email and ("@" not in email or email.startswith("@") or email.endswith("@")):
+            raise ValueError("E-mail do Cliente é inválido")
+        if not isinstance(whatsapp, bool):
+            raise ValueError("Indicador de WhatsApp deve ser booleano")
+        return phone, email, whatsapp
 
     async def delete_client(self, client_id: UUID) -> None:
         async with self._uow_factory() as uow:
@@ -370,6 +477,8 @@ class ArenaInfrastructureService:
         replay_pre_duration_seconds: int,
         replay_post_duration_seconds: int,
         calculate_actual_time: bool,
+        replay_retention_days: int | None,
+        company: dict[str, str],
         now: datetime,
     ) -> dict:
         if default_session_duration_minutes <= 0:
@@ -378,6 +487,39 @@ class ArenaInfrastructureService:
             raise ValueError("As durações do Replay não podem ser negativas")
         if replay_pre_duration_seconds + replay_post_duration_seconds <= 0:
             raise ValueError("A duração total do Replay deve ser maior que zero")
+        if replay_retention_days is not None and (
+            isinstance(replay_retention_days, bool) or replay_retention_days <= 0
+        ):
+            raise ValueError("A retenção dos Replays deve ser maior que zero")
+        normalized_company = {
+            key: str(value or "").strip() for key, value in company.items()
+        }
+        normalized_company["company_tax_id"] = "".join(
+            character for character in normalized_company.get("company_tax_id", "").upper()
+            if character.isalnum() and character.isascii()
+        )
+        normalized_company["company_phone"] = "".join(
+            character for character in normalized_company.get("company_phone", "")
+            if character.isdigit()
+        )
+        normalized_company["company_postal_code"] = "".join(
+            character for character in normalized_company.get("company_postal_code", "")
+            if character.isdigit()
+        )
+        normalized_company["company_state"] = normalized_company.get("company_state", "").upper()
+        tax_id = normalized_company["company_tax_id"]
+        if tax_id and (
+            len(tax_id) != 14 or not tax_id[:12].isalnum() or not tax_id[-2:].isdigit()
+        ):
+            raise ValueError(
+                "O CNPJ deve ter 12 letras ou números e 2 dígitos verificadores"
+            )
+        if normalized_company["company_phone"] and len(normalized_company["company_phone"]) not in {10, 11}:
+            raise ValueError("O telefone deve ter 10 ou 11 dígitos")
+        if normalized_company["company_postal_code"] and len(normalized_company["company_postal_code"]) != 8:
+            raise ValueError("O CEP deve ter 8 dígitos")
+        if normalized_company["company_state"] and len(normalized_company["company_state"]) != 2:
+            raise ValueError("O Estado deve ser informado pela UF com duas letras")
         async with self._uow_factory() as uow:
             await uow.get_operational_settings(lock=True)
             result = await uow.update_operational_settings(
@@ -385,6 +527,8 @@ class ArenaInfrastructureService:
                 replay_pre_duration_seconds,
                 replay_post_duration_seconds,
                 calculate_actual_time,
+                replay_retention_days,
+                normalized_company,
                 now,
             )
             await uow.commit()

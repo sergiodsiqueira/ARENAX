@@ -14,6 +14,7 @@ from arenax.application.use_cases import (
     ArenaInfrastructureService,
     PaymentService,
     PhysicalEventService,
+    ReplaySharingService,
     SessionService,
 )
 from arenax.domain.errors import (
@@ -25,8 +26,18 @@ from arenax.domain.errors import (
 )
 from arenax.domain.identity import User, UserRole, UserStatus
 from arenax.infrastructure.config import settings
+from arenax.infrastructure.health_center import (
+    overall_status,
+    probe_database,
+    probe_http,
+    read_heartbeat,
+    service_probe,
+    storage_health,
+)
+from arenax.infrastructure.host_agent import HostAgentClient, HostAgentUnavailable
 from arenax.infrastructure.live_gateway import LiveGatewayUnavailable, MediaMtxGateway
 from arenax.infrastructure.operational_events import operational_events
+from arenax.infrastructure.postal_code import OpenCepClient, PostalCodeLookupError
 from arenax.infrastructure.security import (
     Argon2PasswordHasher,
     hash_access_token,
@@ -36,12 +47,14 @@ from arenax.infrastructure.uow import SqlAlchemyUnitOfWork
 
 from .schemas import (
     AdminUserResponse,
+    ApplyStorageFolderRequest,
     ButtonPressedRequest,
     ButtonPressedResponse,
     CameraHealthResponse,
     CameraLiveResponse,
     ChangeExpectedAmountRequest,
     ClientResponse,
+    CreateClientRequest,
     CreatedResourceResponse,
     CreateSessionRequest,
     CreateSpaceRequest,
@@ -50,6 +63,7 @@ from .schemas import (
     EquipmentResponse,
     ExpectedAmountResponse,
     ExtendSessionRequest,
+    HealthCenterResponse,
     LoginRequest,
     LoginResponse,
     NamedResourceRequest,
@@ -57,10 +71,13 @@ from .schemas import (
     OperationalSettingsInput,
     OperationalSettingsResponse,
     PaymentResponse,
+    PostalCodeResponse,
     RegisterPaymentRequest,
     ResetUserPasswordRequest,
     SessionResponse,
     SpaceResponse,
+    StorageChangeResponse,
+    StorageFolderResponse,
     UpdateClientRequest,
     UpdateSpaceRequest,
     UpdateUserRequest,
@@ -79,6 +96,7 @@ sessions = SessionService(SqlAlchemyUnitOfWork)
 physical_events = PhysicalEventService(SqlAlchemyUnitOfWork)
 payments = PaymentService(SqlAlchemyUnitOfWork)
 infrastructure = ArenaInfrastructureService(SqlAlchemyUnitOfWork)
+replay_sharing = ReplaySharingService(SqlAlchemyUnitOfWork)
 password_hasher = Argon2PasswordHasher()
 authentication = AuthenticationService(
     SqlAlchemyUnitOfWork, password_hasher, issue_access_token, hash_access_token
@@ -89,6 +107,8 @@ live_gateway = MediaMtxGateway(
     settings.mediamtx_public_webrtc_url,
     settings.live_path_secret,
 )
+host_agent = HostAgentClient(settings.host_agent_url, settings.host_agent_secret)
+postal_codes = OpenCepClient(settings.open_cep_url)
 
 
 @app.exception_handler(DomainError)
@@ -240,27 +260,73 @@ async def reset_user_password(
 
 @app.get("/api/v1/settings", response_model=OperationalSettingsResponse)
 async def get_operational_settings(_user: AdministratorUser):
-    return await infrastructure.get_operational_settings()
+    result = await infrastructure.get_operational_settings()
+    return {**result, "media_storage_path": settings.media_host_path}
 
 
 @app.put("/api/v1/settings", response_model=OperationalSettingsResponse)
 async def update_operational_settings(
     request: OperationalSettingsInput, _user: AdministratorUser
 ):
-    return await infrastructure.update_operational_settings(
+    result = await infrastructure.update_operational_settings(
         request.default_session_duration_minutes,
         request.replay_pre_duration_seconds,
         request.replay_post_duration_seconds,
         request.calculate_actual_time,
+        request.replay_retention_days,
+        {
+            "company_tax_id": request.company_tax_id,
+            "company_legal_name": request.company_legal_name,
+            "company_trade_name": request.company_trade_name,
+            "company_address": request.company_address,
+            "company_postal_code": request.company_postal_code,
+            "company_city": request.company_city,
+            "company_state": request.company_state,
+            "company_phone": request.company_phone,
+        },
         datetime.now(UTC),
     )
+    return {**result, "media_storage_path": settings.media_host_path}
+
+
+@app.get("/api/v1/postal-codes/{postal_code}", response_model=PostalCodeResponse)
+async def lookup_postal_code(postal_code: str, _user: AuthenticatedUser):
+    try:
+        return await postal_codes.lookup(postal_code)
+    except PostalCodeLookupError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.post("/api/v1/storage/select-folder", response_model=StorageFolderResponse)
+async def select_storage_folder(_user: AdministratorUser):
+    try:
+        return await host_agent.select_folder()
+    except HostAgentUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.post(
+    "/api/v1/storage/apply",
+    response_model=StorageChangeResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def apply_storage_folder(request: ApplyStorageFolderRequest, _user: AdministratorUser):
+    try:
+        return await host_agent.apply_storage(request.path)
+    except HostAgentUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @app.post("/api/v1/clients", response_model=CreatedResourceResponse, status_code=201)
 async def create_client(
-    request: NamedResourceRequest, _user: AuthenticatedUser
+    request: CreateClientRequest, _user: AuthenticatedUser
 ):
-    client_id = await infrastructure.create_client(request.name)
+    client_id = await infrastructure.create_client(
+        request.name, request.client_type, request.document,
+        request.postal_code, request.address, request.city, request.state,
+        request.notes, request.phone, request.email, request.whatsapp,
+        request.administrative_status,
+    )
     operational_events.publish("clients", client_id)
     return {"id": client_id}
 
@@ -272,7 +338,12 @@ async def list_clients(_user: AuthenticatedUser):
 
 @app.put("/api/v1/clients/{client_id}", response_model=ClientResponse)
 async def update_client(client_id: UUID, request: UpdateClientRequest, _user: AuthenticatedUser):
-    result = await infrastructure.update_client(client_id, request.name, request.administrative_status)
+    result = await infrastructure.update_client(
+        client_id, request.name, request.client_type, request.document,
+        request.postal_code, request.address, request.city, request.state,
+        request.notes, request.phone, request.email, request.whatsapp,
+        request.administrative_status,
+    )
     operational_events.publish("clients", client_id)
     return result
 
@@ -285,7 +356,9 @@ async def delete_client(client_id: UUID, _user: AuthenticatedUser):
 
 @app.post("/api/v1/people", response_model=CreatedResourceResponse, status_code=201, deprecated=True)
 async def create_person_compatibility(request: NamedResourceRequest, _user: AuthenticatedUser):
-    return {"id": await infrastructure.create_client(request.name)}
+    return {"id": await infrastructure.create_client(
+        request.name, allow_legacy_blank_document=True
+    )}
 
 
 @app.get("/api/v1/people", response_model=list[NamedResourceResponse], deprecated=True)
@@ -297,7 +370,9 @@ async def list_people_compatibility(_user: AuthenticatedUser):
 async def create_space(
     request: CreateSpaceRequest, _user: AdministratorUser
 ):
-    space_id = await infrastructure.create_space(request.name, request.minute_rate_cents)
+    space_id = await infrastructure.create_space(
+        request.name, request.minute_rate_cents, request.administrative_status
+    )
     operational_events.publish("spaces", space_id)
     return {"id": space_id}
 
@@ -385,6 +460,61 @@ async def camera_health(camera_id: UUID, _user: AdministratorUser):
     )
 
 
+@app.get("/api/v1/health-center", response_model=HealthCenterResponse)
+async def health_center(_user: AuthenticatedUser):
+    now = datetime.now(UTC)
+    media_root = Path(settings.media_root)
+    database, mediamtx = await asyncio.gather(
+        service_probe("database", "Banco de dados", probe_database, now),
+        service_probe(
+            "mediamtx",
+            "Vídeo ao vivo",
+            lambda: probe_http(f"{settings.mediamtx_api_url.rstrip('/')}/v3/config/global/get"),
+            now,
+        ),
+    )
+    services = [
+        {"name": "api", "label": "API", "status": "healthy", "checked_at": now},
+        database,
+        mediamtx,
+        {
+            "name": "capture-service",
+            "label": "Captura de vídeo",
+            **read_heartbeat(media_root / "service-health" / "capture-service.json", now, 30),
+        },
+        {
+            "name": "replay-worker",
+            "label": "Processamento de Replays",
+            **read_heartbeat(media_root / "service-health" / "replay-worker.json", now, 90),
+        },
+        storage_health(media_root, now),
+    ]
+    spaces = {item["id"]: item["name"] for item in await infrastructure.list_spaces()}
+    cameras = []
+    for equipment in await infrastructure.list_equipments():
+        if equipment["kind"] != "camera":
+            continue
+        if equipment["administrative_status"] != "active":
+            camera = {"status": "inactive", "checked_at": None, "detail": "Câmera inativa"}
+        else:
+            camera = read_heartbeat(
+                media_root / "capture-health" / f"{equipment['id']}.json", now, 30
+            )
+        cameras.append({
+            "camera_id": equipment["id"],
+            "external_id": equipment["external_id"],
+            "space_id": equipment["space_id"],
+            "space_name": spaces.get(equipment["space_id"], "Espaço desconhecido"),
+            "administrative_status": equipment["administrative_status"],
+            **camera,
+        })
+    relevant_cameras = [item for item in cameras if item["administrative_status"] == "active"]
+    aggregate_items = services + relevant_cameras
+    return HealthCenterResponse(
+        status=overall_status(aggregate_items), checked_at=now, services=services, cameras=cameras
+    )
+
+
 @app.post("/api/v1/cameras/{camera_id}/live", response_model=CameraLiveResponse)
 async def camera_live(camera_id: UUID, _user: AdministratorUser):
     async with SqlAlchemyUnitOfWork() as uow:
@@ -416,6 +546,14 @@ async def get_moment_replay(moment_id: UUID, _user: AuthenticatedUser):
     if media_root not in path.parents or not path.is_file():
         raise HTTPException(404, "Replay file not found")
     return FileResponse(path, media_type="video/mp4", filename=f"{moment_id}.mp4")
+
+
+@app.post("/api/v1/moments/{moment_id}/share", status_code=204)
+async def register_replay_share(moment_id: UUID, user: AuthenticatedUser):
+    session_id = await replay_sharing.register_share(
+        moment_id, user.id, datetime.now(UTC)
+    )
+    operational_events.publish("sessions", session_id)
 
 
 @app.post("/api/v1/sessions", response_model=SessionResponse, status_code=201)

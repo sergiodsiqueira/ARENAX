@@ -5,6 +5,13 @@ info:
 security:
   - cookieAuth: []
 paths:
+  /api/v1/health-center:
+    get:
+      operationId: getHealthCenter
+      summary: Consolidate the current health of ARENAX infrastructure and Cameras.
+      responses:
+        '200': {description: Current infrastructure health projection, content: {application/json: {schema: {$ref: '#/components/schemas/HealthCenter'}}}}
+        '401': {description: Access absent, expired or revoked}
   /api/v1/operational-events:
     get:
       operationId: streamOperationalEvents
@@ -85,6 +92,35 @@ paths:
         '200': {description: Operational settings updated, content: {application/json: {schema: {$ref: '#/components/schemas/OperationalSettings'}}}}
         '403': {description: Administrative permission required}
         '422': {description: Invalid duration values}
+  /api/v1/storage/select-folder:
+    post:
+      operationId: selectReplayStorageFolder
+      summary: Ask the interactive Windows agent to open the native folder picker.
+      responses:
+        '200': {description: Selected folder or a cancelled selection, content: {application/json: {schema: {$ref: '#/components/schemas/StorageFolderSelection'}}}}
+        '403': {description: Administrative permission required}
+        '503': {description: Local Agent is not installed, configured or available}
+  /api/v1/postal-codes/{postalCode}:
+    get:
+      operationId: lookupPostalCode
+      summary: Look up a Brazilian postal code through the configured OpenCEP gateway.
+      parameters: [{name: postalCode, in: path, required: true, schema: {type: string}}]
+      responses:
+        '200': {description: Address suggestion, content: {application/json: {schema: {$ref: '#/components/schemas/PostalCode'}}}}
+        '401': {description: Active authenticated User required}
+        '422': {description: Postal code must contain 8 digits}
+        '503': {description: OpenCEP is temporarily unavailable}
+  /api/v1/storage/apply:
+    post:
+      operationId: applyReplayStorageFolder
+      summary: Start the validated local media migration and Docker remount.
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [path], properties: {path: {type: string, minLength: 3}}}}}
+      responses:
+        '202': {description: Migration accepted, content: {application/json: {schema: {$ref: '#/components/schemas/StorageChange'}}}}
+        '403': {description: Administrative permission required}
+        '503': {description: Local Agent is not installed, configured or available}
   /api/v1/clients:
     get:
       operationId: listClients
@@ -94,7 +130,7 @@ paths:
           content: {application/json: {schema: {type: array, items: {$ref: '#/components/schemas/Client'}}}}
     post:
       operationId: createClient
-      requestBody: {$ref: '#/components/requestBodies/NamedResource'}
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/CreateClientInput'}}}}
       responses: {'201': {$ref: '#/components/responses/Created'}}
   /api/v1/clients/{clientId}:
     put:
@@ -211,6 +247,15 @@ paths:
       responses:
         '200': {description: Generated Replay MP4, content: {video/mp4: {schema: {type: string, format: binary}}}}
         '404': {description: Replay not generated or file unavailable}
+  /api/v1/moments/{momentId}/share:
+    post:
+      operationId: registerReplayShare
+      summary: Audit an authenticated local Replay sharing intention.
+      parameters: [{name: momentId, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '204': {description: Sharing intention registered in the Session Timeline}
+        '401': {description: Access absent, expired or revoked}
+        '404': {description: Replay unavailable}
   /api/v1/sessions:
     get:
       operationId: getAgenda
@@ -403,14 +448,50 @@ components:
       allOf:
         - {$ref: '#/components/schemas/NamedResource'}
         - type: object
-          required: [administrative_status]
+          required: [client_type, document, postal_code, address, city, state, notes, phone, email, whatsapp, administrative_status]
           properties:
+            client_type: {type: string, enum: [F, J]}
+            document: {type: string, pattern: '^$|^(?:[0-9]{11}|[A-Z0-9]{12}[0-9]{2})$'}
+            postal_code: {type: string, pattern: '^$|^[0-9]{8}$'}
+            address: {type: string, maxLength: 250}
+            city: {type: string, maxLength: 120}
+            state: {type: string, pattern: '^$|^[A-Z]{2}$'}
+            notes: {type: string}
+            phone: {type: string, pattern: '^$|^[0-9]{10,11}$'}
+            email: {type: string}
+            whatsapp: {type: boolean}
             administrative_status: {type: string, enum: [active, inactive]}
-    ClientInput:
+    CreateClientInput:
       type: object
-      required: [name, administrative_status]
+      required: [name, client_type, postal_code, address, city, state]
       properties:
         name: {type: string, maxLength: 160}
+        client_type: {type: string, enum: [F, J]}
+        document: {type: string, pattern: '^$|^(?:[0-9]{11}|[A-Z0-9]{12}[0-9]{2})$', default: ''}
+        postal_code: {type: string, pattern: '^$|^[0-9]{8}$'}
+        address: {type: string, maxLength: 250}
+        city: {type: string, maxLength: 120}
+        state: {type: string, pattern: '^$|^[A-Z]{2}$'}
+        notes: {type: string}
+        phone: {type: string, pattern: '^$|^[0-9]{10,11}$', default: ''}
+        email: {type: string, default: ''}
+        whatsapp: {type: boolean, default: false}
+        administrative_status: {type: string, enum: [active, inactive], default: active}
+    ClientInput:
+      type: object
+      required: [name, client_type, postal_code, address, city, state, administrative_status]
+      properties:
+        name: {type: string, maxLength: 160}
+        client_type: {type: string, enum: [F, J]}
+        document: {type: string, pattern: '^$|^(?:[0-9]{11}|[A-Z0-9]{12}[0-9]{2})$', default: ''}
+        postal_code: {type: string, pattern: '^$|^[0-9]{8}$'}
+        address: {type: string, maxLength: 250}
+        city: {type: string, maxLength: 120}
+        state: {type: string, pattern: '^$|^[A-Z]{2}$'}
+        notes: {type: string}
+        phone: {type: string, pattern: '^$|^[0-9]{10,11}$', default: ''}
+        email: {type: string, default: ''}
+        whatsapp: {type: boolean, default: false}
         administrative_status: {type: string, enum: [active, inactive]}
     Space:
       allOf:
@@ -425,6 +506,7 @@ components:
       required: [name, minute_rate_cents]
       properties:
         name: {type: string, maxLength: 120}
+        administrative_status: {type: string, enum: [active, disabled], default: active}
         minute_rate_cents: {type: integer, minimum: 0}
     SpaceInput:
       type: object
@@ -460,6 +542,39 @@ components:
       type: object
       required: [url]
       properties: {url: {type: string, format: uri}}
+    HealthItem:
+      type: object
+      required: [name, label, status]
+      properties:
+        name: {type: string}
+        label: {type: string}
+        status: {type: string, enum: [healthy, degraded, unavailable, unknown]}
+        checked_at: {type: [string, 'null'], format: date-time}
+        detail: {type: [string, 'null']}
+        response_time_ms: {type: [integer, 'null']}
+        total_bytes: {type: [integer, 'null']}
+        free_bytes: {type: [integer, 'null']}
+        used_percent: {type: [number, 'null']}
+    CameraHealthItem:
+      type: object
+      required: [camera_id, external_id, space_id, space_name, administrative_status, status]
+      properties:
+        camera_id: {type: string, format: uuid}
+        external_id: {type: string}
+        space_id: {type: string, format: uuid}
+        space_name: {type: string}
+        administrative_status: {type: string, enum: [active, inactive]}
+        status: {type: string, enum: [healthy, unavailable, unknown, inactive]}
+        checked_at: {type: [string, 'null'], format: date-time}
+        detail: {type: [string, 'null']}
+    HealthCenter:
+      type: object
+      required: [status, checked_at, services, cameras]
+      properties:
+        status: {type: string, enum: [healthy, attention, critical]}
+        checked_at: {type: string, format: date-time}
+        services: {type: array, items: {$ref: '#/components/schemas/HealthItem'}}
+        cameras: {type: array, items: {$ref: '#/components/schemas/CameraHealthItem'}}
     OperationalSettingsInput:
       type: object
       required: [default_session_duration_minutes, replay_pre_duration_seconds, replay_post_duration_seconds, calculate_actual_time]
@@ -468,12 +583,47 @@ components:
         replay_pre_duration_seconds: {type: integer, minimum: 0}
         replay_post_duration_seconds: {type: integer, minimum: 0}
         calculate_actual_time: {type: boolean, default: true}
+        replay_retention_days:
+          description: Null disables automatic Replay removal.
+          type: [integer, 'null']
+          minimum: 1
+        company_tax_id: {type: string, pattern: '^$|^[A-Z0-9]{12}[0-9]{2}$'}
+        company_legal_name: {type: string, maxLength: 180}
+        company_trade_name: {type: string, maxLength: 180}
+        company_address: {type: string, maxLength: 250}
+        company_postal_code: {type: string, pattern: '^$|^[0-9]{8}$'}
+        company_city: {type: string, maxLength: 120}
+        company_state: {type: string, pattern: '^$|^[A-Z]{2}$'}
+        company_phone: {type: string, pattern: '^$|^[0-9]{10,11}$'}
     OperationalSettings:
       allOf:
         - {$ref: '#/components/schemas/OperationalSettingsInput'}
         - type: object
-          required: [updated_at]
-          properties: {updated_at: {type: string, format: date-time}}
+          required: [updated_at, media_storage_path]
+          properties:
+            updated_at: {type: string, format: date-time}
+            media_storage_path: {type: string}
+    StorageFolderSelection:
+      type: object
+      required: [path, cancelled]
+      properties:
+        path: {type: [string, 'null']}
+        cancelled: {type: boolean}
+    PostalCode:
+      type: object
+      required: [postal_code, street, neighborhood, city, state]
+      properties:
+        postal_code: {type: string, pattern: '^[0-9]{8}$'}
+        street: {type: string}
+        neighborhood: {type: string}
+        city: {type: string}
+        state: {type: string}
+    StorageChange:
+      type: object
+      required: [accepted, path]
+      properties:
+        accepted: {type: boolean}
+        path: {type: string}
     SessionInput:
       type: object
       required: [responsible_client_id, space_ids, scheduled_start, scheduled_end]

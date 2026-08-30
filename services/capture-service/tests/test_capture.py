@@ -50,3 +50,12 @@ def test_retention_removes_only_expired_mp4_files(tmp_path, monkeypatch):
     assert not old_segment.exists()
     assert current_segment.exists()
     assert ignored.exists()
+
+
+def test_service_health_is_written_atomically(tmp_path, monkeypatch):
+    monkeypatch.setattr(capture_service, "MEDIA_ROOT", tmp_path)
+    capture_service.write_service_health()
+    payload = __import__("json").loads(
+        (tmp_path / "service-health" / "capture-service.json").read_text()
+    )
+    assert payload["status"] == "running"

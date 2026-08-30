@@ -29,10 +29,13 @@ services:
       ARENAX_MEDIAMTX_API_URL: http://mediamtx:9997
       ARENAX_MEDIAMTX_PUBLIC_WEBRTC_URL: ${ARENAX_MEDIAMTX_PUBLIC_WEBRTC_URL:-http://localhost:8889}
       ARENAX_LIVE_PATH_SECRET: ${ARENAX_LIVE_PATH_SECRET:-arenax-local-development}
+      ARENAX_MEDIA_HOST_PATH: ${ARENAX_MEDIA_HOST_PATH:-./media}
+      ARENAX_HOST_AGENT_URL: http://host.docker.internal:8765
+      ARENAX_HOST_AGENT_SECRET: ${ARENAX_HOST_AGENT_SECRET:-}
     ports:
       - "8000:8000"
     volumes:
-      - ./media:/media:ro
+      - ${ARENAX_MEDIA_HOST_PATH:-./media}:/media:ro
     healthcheck:
       test:
         - CMD
@@ -70,7 +73,7 @@ services:
       CAPTURE_SEGMENT_SECONDS: 2
       CAPTURE_RETENTION_SECONDS: 120
     volumes:
-      - ./media:/media
+      - ${ARENAX_MEDIA_HOST_PATH:-./media}:/media
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -82,7 +85,7 @@ services:
       MEDIA_ROOT: /media
       CAPTURE_SEGMENT_SECONDS: 2
     volumes:
-      - ./media:/media
+      - ${ARENAX_MEDIA_HOST_PATH:-./media}:/media
     depends_on:
       migrate:
         condition: service_completed_successfully

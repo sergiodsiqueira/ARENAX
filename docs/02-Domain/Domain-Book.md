@@ -26,7 +26,9 @@ Qualquer recurso físico da Arena que participe de uma Sessão: Society, Beach T
 O acionamento físico solicita um **Momento**. Replay é o conteúdo de vídeo produzido para esse Momento. No futuro, um Momento pode representar gol, defesa, ponto ou outro evento.
 
 ## Cliente / Responsável
-Cliente é o cadastro de uma pessoa atendida pela Arena. Em uma Sessão, exerce o papel de Responsável. Participantes detalhados ficam fora do MVP.
+Cliente é o cadastro de uma pessoa física ou jurídica atendida pela Arena,
+identificada respectivamente por CPF ou CNPJ. Em uma Sessão, exerce o papel de
+Responsável. Participantes detalhados ficam fora do MVP.
 
 ## Equipamento
 Hardware físico. Tipos iniciais: Câmera IP e AX Device. Futuramente: placar, iluminação, catraca e sensores.

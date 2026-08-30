@@ -28,3 +28,15 @@ Ao lado dos valores, a ação com lápis abre um modal para substituir o valor
 previsto da Sessão. A ação de atualizar recalcula usando os valores por minuto
 históricos fotografados na Sessão. As ações ficam separadas visualmente e fornecem feedback por
 toast.
+
+## Entrega de Replay na v1
+
+Cada Replay pronto mantém `Baixar` e oferece `Compartilhar` no mesmo menu. A ação
+Compartilhar tenta enviar o arquivo ao seletor nativo do sistema, no qual o Usuário
+pode escolher WhatsApp quando disponível. Se o navegador não aceitar arquivos no
+compartilhamento nativo, a ARENAX baixa o vídeo e abre o WhatsApp com uma mensagem
+preenchida; o anexo é manual.
+
+Não há página pública ou acesso de Cliente. A Timeline registra a intenção explícita
+de Compartilhar, mas não afirma qual aplicativo recebeu o arquivo nem confirma sua
+entrega ao destinatário.

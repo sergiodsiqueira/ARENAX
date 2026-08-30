@@ -6,8 +6,9 @@ import { toast } from "sonner";
 import { AppShell } from "../components/AppShell";
 import { StatusCounterCard } from "../components/StatusCounterCard";
 import { ConfirmationAlertDialog } from "../components/ui/confirmation-alert-dialog";
-import { Combobox } from "../components/ui/combobox";
+import { Checkbox } from "../components/ui/checkbox";
 import { Input } from "../components/ui/input";
+import { SearchInput } from "../components/ui/search-input";
 import {
   createSpace,
   deleteSpace,
@@ -22,6 +23,7 @@ export function SpacesAdministrationPage() {
   const navigate = useNavigate(),
     qc = useQueryClient();
   const [filter, setFilter] = useState<Filter>("active"),
+    [search, setSearch] = useState(""),
     [modal, setModal] = useState<Space | "new" | null>(null),
     [name, setName] = useState(""),
     [minuteRate, setMinuteRate] = useState(""),
@@ -39,7 +41,7 @@ export function SpacesAdministrationPage() {
   const save = useMutation({
     mutationFn: async () =>
       modal === "new"
-        ? createSpace({ name: name.trim(), minute_rate_cents: parseCurrency(minuteRate) })
+        ? createSpace({ name: name.trim(), administrative_status: status, minute_rate_cents: parseCurrency(minuteRate) })
         : updateSpace(modal!.id, {
             name: name.trim(),
             administrative_status: status,
@@ -69,12 +71,13 @@ export function SpacesAdministrationPage() {
   };
   const rows = useMemo(
     () =>
-      (spaces.data ?? []).filter(
-        (x) =>
-          filter === "all" ||
-          (filter === "active" ? !inactive(x) : inactive(x)),
-      ),
-    [spaces.data, filter],
+      (spaces.data ?? []).filter((x) => {
+        const term = search.trim().toLocaleLowerCase("pt-BR");
+        const matchesStatus = Boolean(term) || filter === "all" || (filter === "active" ? !inactive(x) : inactive(x));
+        const matchesSearch = x.name.toLocaleLowerCase("pt-BR").includes(term);
+        return matchesStatus && matchesSearch;
+      }),
+    [spaces.data, filter, search],
   );
   const open = (x: Space | "new") => {
     setModal(x);
@@ -120,7 +123,8 @@ export function SpacesAdministrationPage() {
             onClick={() => setFilter("all")}
           />
         </div>
-        <section className="mt-6 overflow-hidden rounded-2xl border bg-white shadow-sm">
+        <SearchInput className="mt-6" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Pesquisar Espaços" aria-label="Pesquisar Espaços" />
+        <section className="mt-4 overflow-hidden rounded-2xl border bg-white shadow-sm">
           <div className="grid grid-cols-[80px_1fr_110px] border-b bg-slate-50 px-4 py-3 text-xs font-semibold uppercase text-slate-500">
             <span>Tipo</span>
             <span>Descrição</span>
@@ -188,25 +192,26 @@ export function SpacesAdministrationPage() {
                   required
                 />
               </label>
-              <label className="mt-4 block text-sm font-semibold">
-                Valor por minuto (R$)
-                <Input
-                  className="mt-2"
-                  value={minuteRate}
-                  onChange={(e) => setMinuteRate(e.target.value)}
-                  inputMode="decimal"
-                  placeholder="0,00"
-                  required
-                />
-              </label>
-              <label className="mt-4 block text-sm font-semibold">
-                Estado
-                <Combobox
-                  value={status}
-                  onValueChange={setStatus}
-                  options={[{ value: "active", label: "Ativo" }, { value: "maintenance", label: "Manutenção" }, { value: "disabled", label: "Desativado" }]}
-                />
-              </label>
+              <div className="mt-4 grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                <label className="block text-sm font-semibold">
+                  Valor por minuto (R$)
+                  <Input
+                    className="mt-2"
+                    value={minuteRate}
+                    onChange={(e) => setMinuteRate(e.target.value)}
+                    inputMode="decimal"
+                    placeholder="0,00"
+                    required
+                  />
+                </label>
+                <label className="flex h-9 cursor-pointer items-center gap-2 whitespace-nowrap text-sm font-semibold">
+                  <Checkbox
+                    checked={status === "active"}
+                    onCheckedChange={(checked) => setStatus(checked === true ? "active" : "disabled")}
+                  />
+                  Ativo
+                </label>
+              </div>
               <div className="mt-6 flex justify-end gap-2">
                 <button
                   type="button"

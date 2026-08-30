@@ -47,9 +47,12 @@ export function LoginPage() {
         <div className="brand-glow brand-glow-one" />
         <div className="brand-glow brand-glow-two" />
 
-        <a className="relative z-10 flex w-fit items-center gap-3" href="/login" aria-label="ARENAX">
-          <span className="logo-mark" aria-hidden="true"><span /></span>
-          <span className="text-[1.35rem] font-extrabold tracking-[0.22em]">ARENAX</span>
+        <a className="relative z-10 block w-fit" href="/login" aria-label="ARENAX">
+          <img
+            className="h-[5.2rem] w-auto max-w-[15.6rem] object-contain"
+            src="/branding/ARENAX_BRANCO.png"
+            alt="ARENAX"
+          />
         </a>
 
         <div className="relative z-10 max-w-2xl pb-8">

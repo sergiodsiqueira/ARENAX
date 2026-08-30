@@ -19,6 +19,16 @@ Core rule:
 
 Pré-requisito: Docker com Compose.
 
+O diretório de mídia é definido durante a instalação. Instale uma vez o Agente
+Local, em um PowerShell aberto como Administrador:
+
+```powershell
+.\services\local-agent\install.ps1
+```
+
+Depois disso, Proprietários e Administradores alteram a pasta pela tela de
+Configurações, usando o seletor nativo do Windows e sem executar comandos.
+
 ```powershell
 docker compose up --build
 ```

@@ -64,25 +64,35 @@ não foram commitadas.
   na Timeline e preservação obrigatória dos preços históricos da Sessão.
 - Configuração `calcular_tempo_real`, ativa por padrão, para escolher entre minutos
   reais e período previsto no cálculo automático do valor da Sessão.
+- Health Center operacional, disponível a todo Usuário autenticado, com estado consolidado da API, banco, MediaMTX,
+  Capture Service, Replay Worker, armazenamento e Câmeras por Espaço. Serviços de
+  vídeo publicam heartbeats e relatórios antigos deixam de ser considerados saudáveis.
+- Retenção configurável de Replays, desativada por padrão, com expiração preservando
+  Momento e Timeline; download e compartilhamento local auditado no Dossiê.
+- Diretório de mídia configurável na instalação e alterável pela interface por meio
+  do Agente Local seguro do Windows,
+  preparado a partir da tela de Configurações.
 
 ## Navegação atual
 
 - Operação
   - Mission Control
   - Agenda
+  - Health Center
 - Cadastros
   - Clientes
   - Espaços
 - Administração
   - Equipamentos
   - Acessos
+  - Configurações
 
 ## Validação mais recente
 
-- API: 59 testes aprovados no Docker.
+- API: 66 testes aprovados no Docker.
 - Frontend: ESLint aprovado.
 - Frontend: build de produção aprovado.
-- Migration atual do banco: `0010`.
+- Migration atual do banco: `0011`.
 - API em execução e saudável em `http://localhost:8000`.
 - Frontend local em `http://localhost:5173`.
 
@@ -97,13 +107,16 @@ não foram commitadas.
 
 ## Próximos passos sugeridos
 
-1. Implementar o Health Center básico.
-2. Revisar os demais itens pendentes do MVP.
-3. Implementar o Compartilhamento de Replays como última entrega do MVP.
+1. Adicionar saúde dos AX Devices quando houver heartbeat ou último contato confiável.
+2. Fechar validade, experiência de entrega e auditoria do Compartilhamento.
+3. Implementar o Compartilhamento local de Replays como última entrega do MVP.
 
-O formato do Compartilhamento ainda será decidido. Não assumir, por enquanto,
-link público na internet, acesso restrito à rede local, armazenamento em nuvem ou
-modelo híbrido.
+O Compartilhamento da v1 será local, autenticado e sem link público. Os vídeos
+ficarão em pasta local configurável. A aplicação em Docker exige que esse diretório
+seja montado de forma consistente na API, no Capture Service e no Replay Worker;
+a aplicação da troca de diretório ainda precisa de decisão técnica.
+
+O Arena Designer foi removido da v1 e movido para a v1.1.
 
 ## Retomada
 

@@ -19,6 +19,20 @@ MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", "/media"))
 PRE_SECONDS = int(os.getenv("REPLAY_PRE_SECONDS", "30"))
 POST_SECONDS = int(os.getenv("REPLAY_POST_SECONDS", "5"))
 SEGMENT_SECONDS = int(os.getenv("CAPTURE_SEGMENT_SECONDS", "2"))
+CLEANUP_INTERVAL_SECONDS = int(os.getenv("REPLAY_CLEANUP_INTERVAL_SECONDS", "3600"))
+
+
+def write_service_health(status: str = "running", error: str | None = None) -> None:
+    health_dir = MEDIA_ROOT / "service-health"
+    health_dir.mkdir(parents=True, exist_ok=True)
+    target = health_dir / "replay-worker.json"
+    temporary = target.with_suffix(".tmp")
+    temporary.write_text(json.dumps({
+        "status": status,
+        "checkedAt": datetime.now(timezone.utc).isoformat(),
+        "error": error,
+    }), encoding="utf-8")
+    temporary.replace(target)
 
 
 async def generate_replay(source: str, output: Path) -> None:
@@ -127,10 +141,49 @@ async def process_one(connection) -> bool:
         return True
 
 
+async def remove_expired_replays(connection, now: datetime) -> int:
+    retention_days = await connection.fetchval(
+        "SELECT retencao_replays_dias FROM configuracoes WHERE id = 1"
+    )
+    if retention_days is None:
+        return 0
+    rows = await connection.fetch("""
+        SELECT id, sessao_id, caminho_replay FROM momentos
+        WHERE status = 'ready'
+          AND caminho_replay IS NOT NULL
+          AND ocorrido_em < $1
+        ORDER BY ocorrido_em
+    """, now - timedelta(days=retention_days))
+    replay_root = (MEDIA_ROOT / "replays").resolve()
+    removed = 0
+    for row in rows:
+        path = Path(row["caminho_replay"]).resolve()
+        if replay_root not in path.parents:
+            continue
+        path.unlink(missing_ok=True)
+        async with connection.transaction():
+            await connection.execute(
+                "UPDATE momentos SET status='expired', caminho_replay=NULL WHERE id=$1",
+                row["id"],
+            )
+            await connection.execute("""INSERT INTO linha_do_tempo
+                (id, sessao_id, tipo, ocorrido_em, dados)
+                VALUES(gen_random_uuid(), $1, 'ReplayExpired', $2, $3::json)""",
+                row["sessao_id"], now, json.dumps({"momentId": str(row["id"])}))
+        removed += 1
+    return removed
+
+
 async def main():
     connection = await asyncpg.connect(DATABASE_URL)
+    next_cleanup = 0.0
     try:
         while True:
+            write_service_health()
+            loop_time = asyncio.get_running_loop().time()
+            if loop_time >= next_cleanup:
+                await remove_expired_replays(connection, datetime.now(timezone.utc))
+                next_cleanup = loop_time + CLEANUP_INTERVAL_SECONDS
             if not await process_one(connection):
                 await asyncio.sleep(1)
     finally:

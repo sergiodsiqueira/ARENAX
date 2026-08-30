@@ -12,6 +12,7 @@ import { EquipmentsAdministrationPage } from "./pages/EquipmentsAdministrationPa
 import { AgendaPage } from "./pages/AgendaPage";
 import { SessionDossierPage } from "./pages/SessionDossierPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { HealthCenterPage } from "./pages/HealthCenterPage";
 import { Toaster } from "./components/ui/sonner";
 import "./styles.css";
 
@@ -29,6 +30,8 @@ createRoot(document.getElementById("root")!).render(
           <Route path="/administracao/acessos" element={<AccessAdministrationPage />} />
           <Route path="/administracao/equipamentos" element={<EquipmentsAdministrationPage />} />
           <Route path="/administracao/configuracoes" element={<SettingsPage />} />
+          <Route path="/health-center" element={<HealthCenterPage />} />
+          <Route path="/administracao/health-center" element={<Navigate to="/health-center" replace />} />
           <Route path="/cadastros/clientes" element={<ClientsAdministrationPage />} />
           <Route path="/cadastros/espacos" element={<SpacesAdministrationPage />} />
           <Route path="/administracao/clientes" element={<Navigate to="/cadastros/clientes" replace />} />

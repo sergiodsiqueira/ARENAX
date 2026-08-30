@@ -64,10 +64,34 @@ class NamedResourceResponse(BaseModel):
 
 
 class ClientResponse(NamedResourceResponse):
+    client_type: Literal["F", "J"]
+    document: str
+    postal_code: str
+    address: str
+    city: str
+    state: str
+    notes: str
+    phone: str
+    email: str
+    whatsapp: bool
     administrative_status: str
 
 
-class UpdateClientRequest(NamedResourceRequest):
+class CreateClientRequest(NamedResourceRequest):
+    client_type: Literal["F", "J"]
+    document: str = Field(default="", max_length=18)
+    postal_code: str = Field(default="", max_length=9)
+    address: str = Field(default="", max_length=250)
+    city: str = Field(default="", max_length=120)
+    state: str = Field(default="", max_length=2)
+    notes: str = ""
+    phone: str = Field(default="", max_length=15)
+    email: str = Field(default="", max_length=320)
+    whatsapp: bool = False
+    administrative_status: Literal["active", "inactive"] = "active"
+
+
+class UpdateClientRequest(CreateClientRequest):
     administrative_status: Literal["active", "inactive"]
 
 
@@ -77,6 +101,7 @@ class SpaceResponse(NamedResourceResponse):
 
 
 class CreateSpaceRequest(NamedResourceRequest):
+    administrative_status: Literal["active", "disabled"] = "active"
     minute_rate_cents: int = Field(ge=0)
 
 
@@ -142,6 +167,36 @@ class CameraHealthResponse(BaseModel):
     error: str | None = None
 
 
+class HealthItemResponse(BaseModel):
+    name: str
+    label: str
+    status: str
+    checked_at: datetime | None = None
+    detail: str | None = None
+    response_time_ms: int | None = None
+    total_bytes: int | None = None
+    free_bytes: int | None = None
+    used_percent: float | None = None
+
+
+class CameraHealthItemResponse(BaseModel):
+    camera_id: UUID
+    external_id: str
+    space_id: UUID
+    space_name: str
+    administrative_status: str
+    status: str
+    checked_at: datetime | None = None
+    detail: str | None = None
+
+
+class HealthCenterResponse(BaseModel):
+    status: str
+    checked_at: datetime
+    services: list[HealthItemResponse]
+    cameras: list[CameraHealthItemResponse]
+
+
 class CameraLiveResponse(BaseModel):
     url: str
 
@@ -151,10 +206,42 @@ class OperationalSettingsInput(BaseModel):
     replay_pre_duration_seconds: int = Field(ge=0)
     replay_post_duration_seconds: int = Field(ge=0)
     calculate_actual_time: bool
+    replay_retention_days: int | None = Field(default=None, gt=0)
+    company_tax_id: str = Field(default="", max_length=18)
+    company_legal_name: str = Field(default="", max_length=180)
+    company_trade_name: str = Field(default="", max_length=180)
+    company_address: str = Field(default="", max_length=250)
+    company_postal_code: str = Field(default="", max_length=9)
+    company_city: str = Field(default="", max_length=120)
+    company_state: str = Field(default="", max_length=2)
+    company_phone: str = Field(default="", max_length=15)
 
 
 class OperationalSettingsResponse(OperationalSettingsInput):
     updated_at: datetime
+    media_storage_path: str
+
+
+class StorageFolderResponse(BaseModel):
+    path: str | None
+    cancelled: bool = False
+
+
+class ApplyStorageFolderRequest(BaseModel):
+    path: str = Field(min_length=3, max_length=1024)
+
+
+class StorageChangeResponse(BaseModel):
+    accepted: bool
+    path: str
+
+
+class PostalCodeResponse(BaseModel):
+    postal_code: str
+    street: str
+    neighborhood: str
+    city: str
+    state: str
 
 
 class RegisterPaymentRequest(BaseModel):

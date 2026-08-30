@@ -13,6 +13,7 @@ class SpaceUnitOfWork:
     async def __aenter__(self): return self
     async def __aexit__(self, *_): return None
     async def get_space(self, space_id, **_): return self.space if self.space and self.space["id"] == space_id else None
+    async def add_space(self, name, minute_rate_cents, status): self.space = {"id": uuid4(), "name": name, "administrative_status": status, "minute_rate_cents": minute_rate_cents}; return self.space["id"]
     async def update_space(self, space_id, name, status, minute_rate_cents): self.space = {"id": space_id, "name": name, "administrative_status": status, "minute_rate_cents": minute_rate_cents}; return self.space
     async def space_has_dependencies(self, _space_id): return self.has_dependencies
     async def delete_space(self, _space_id): self.deleted = True
@@ -25,6 +26,14 @@ async def test_updates_space_name_and_status():
     uow = SpaceUnitOfWork(space)
     result = await ArenaInfrastructureService(lambda: uow).update_space(space["id"], " Society 01 ", "maintenance", 250)
     assert result == {"id": space["id"], "name": "Society 01", "administrative_status": "maintenance", "minute_rate_cents": 250}
+    assert uow.committed
+
+
+@pytest.mark.asyncio
+async def test_creates_inactive_space():
+    uow = SpaceUnitOfWork()
+    await ArenaInfrastructureService(lambda: uow).create_space("Quadra", 250, "disabled")
+    assert uow.space["administrative_status"] == "disabled"
     assert uow.committed
 
 

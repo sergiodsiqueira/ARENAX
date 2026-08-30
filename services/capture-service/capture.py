@@ -76,6 +76,19 @@ def write_health(camera_id: UUID, status: str, error: str | None = None) -> None
     temporary.replace(target)
 
 
+def write_service_health(status: str = "running", error: str | None = None) -> None:
+    health_dir = MEDIA_ROOT / "service-health"
+    health_dir.mkdir(parents=True, exist_ok=True)
+    target = health_dir / "capture-service.json"
+    temporary = target.with_suffix(".tmp")
+    temporary.write_text(json.dumps({
+        "status": status,
+        "checkedAt": datetime.now(timezone.utc).isoformat(),
+        "error": error,
+    }), encoding="utf-8")
+    temporary.replace(target)
+
+
 async def capture(camera: Camera) -> None:
     buffer_dir = MEDIA_ROOT / "buffers" / str(camera.id)
     buffer_dir.mkdir(parents=True, exist_ok=True)
@@ -88,11 +101,19 @@ async def capture(camera: Camera) -> None:
             stderr=asyncio.subprocess.PIPE,
         )
         write_health(camera.id, "capturing")
+        communication = asyncio.create_task(process.communicate())
         try:
-            _, stderr = await process.communicate()
+            while not communication.done():
+                write_health(camera.id, "capturing")
+                try:
+                    await asyncio.wait_for(asyncio.shield(communication), timeout=POLL_SECONDS)
+                except TimeoutError:
+                    continue
+            _, stderr = await communication
         except asyncio.CancelledError:
             process.terminate()
             await process.wait()
+            communication.cancel()
             raise
         message = stderr.decode(errors="replace")[-1000:] or f"ffmpeg exited {process.returncode}"
         write_health(camera.id, "failed", message)
@@ -112,6 +133,7 @@ async def main() -> None:
     tasks: dict[UUID, tuple[Camera, asyncio.Task]] = {}
     try:
         while True:
+            write_service_health()
             cameras = await load_cameras(connection)
             for camera_id, (camera, task) in list(tasks.items()):
                 if camera_id not in cameras or cameras[camera_id] != camera:

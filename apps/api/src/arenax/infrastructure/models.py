@@ -7,9 +7,12 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
+    Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -39,6 +42,20 @@ class OperationalSettingsModel(Base):
             "duracao_replay_anterior_segundos + duracao_replay_posterior_segundos > 0",
             name="ck_configuracoes_duracao_replay_positiva",
         ),
+        CheckConstraint(
+            "retencao_replays_dias IS NULL OR retencao_replays_dias > 0",
+            name="ck_configuracoes_retencao_replays_positiva",
+        ),
+        CheckConstraint(
+            "cnpj = '' OR cnpj ~ '^[A-Z0-9]{12}[0-9]{2}$'",
+            name="ck_configuracoes_cnpj",
+        ),
+        CheckConstraint(
+            "telefone = '' OR length(telefone) IN (10, 11)",
+            name="ck_configuracoes_telefone",
+        ),
+        CheckConstraint("estado = '' OR length(estado) = 2", name="ck_configuracoes_estado"),
+        CheckConstraint("cep = '' OR length(cep) = 8", name="ck_configuracoes_cep"),
     )
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
     default_session_duration_minutes: Mapped[int] = mapped_column(
@@ -53,6 +70,17 @@ class OperationalSettingsModel(Base):
     calculate_actual_time: Mapped[bool] = mapped_column(
         "calcular_tempo_real", Boolean, default=True
     )
+    replay_retention_days: Mapped[int | None] = mapped_column(
+        "retencao_replays_dias", Integer, nullable=True
+    )
+    company_tax_id: Mapped[str] = mapped_column("cnpj", String(14), default="")
+    company_legal_name: Mapped[str] = mapped_column("nome_empresa", String(180), default="")
+    company_trade_name: Mapped[str] = mapped_column("nome_fantasia", String(180), default="")
+    company_address: Mapped[str] = mapped_column("endereco", String(250), default="")
+    company_postal_code: Mapped[str] = mapped_column("cep", String(8), default="")
+    company_city: Mapped[str] = mapped_column("cidade", String(120), default="")
+    company_state: Mapped[str] = mapped_column("estado", String(2), default="")
+    company_phone: Mapped[str] = mapped_column("telefone", String(11), default="")
     updated_at: Mapped[datetime] = mapped_column(
         "atualizado_em", DateTime(timezone=True)
     )
@@ -60,8 +88,36 @@ class OperationalSettingsModel(Base):
 
 class ClientModel(Base):
     __tablename__ = "clientes"
+    __table_args__ = (
+        CheckConstraint("tipo IN ('F', 'J')", name="ck_clientes_tipo"),
+        CheckConstraint(
+            "documento = '' OR "
+            "(tipo = 'F' AND documento ~ '^[0-9]{11}$') OR "
+            "(tipo = 'J' AND documento ~ '^[A-Z0-9]{12}[0-9]{2}$')",
+            name="ck_clientes_documento",
+        ),
+        CheckConstraint("cep = '' OR length(cep) = 8", name="ck_clientes_cep"),
+        CheckConstraint("uf = '' OR length(uf) = 2", name="ck_clientes_uf"),
+        CheckConstraint("telefone = '' OR length(telefone) IN (10, 11)", name="ck_clientes_telefone"),
+        Index(
+            "uq_clientes_documento_informado",
+            "documento",
+            unique=True,
+            postgresql_where=text("documento <> ''"),
+        ),
+    )
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column("nome", String(160))
+    client_type: Mapped[str] = mapped_column("tipo", String(1), default="F")
+    document: Mapped[str] = mapped_column("documento", String(14), default="")
+    postal_code: Mapped[str] = mapped_column("cep", String(8), default="")
+    address: Mapped[str] = mapped_column("endereco", String(250), default="")
+    city: Mapped[str] = mapped_column("cidade", String(120), default="")
+    state: Mapped[str] = mapped_column("uf", String(2), default="")
+    notes: Mapped[str] = mapped_column("observacoes", Text, default="")
+    phone: Mapped[str] = mapped_column("telefone", String(11), default="")
+    email: Mapped[str] = mapped_column("email", String(320), default="")
+    whatsapp: Mapped[bool] = mapped_column("whatsapp", Boolean, default=False)
     administrative_status: Mapped[str] = mapped_column("status_administrativo", String(20), default="active")
 
 

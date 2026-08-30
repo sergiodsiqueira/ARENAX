@@ -16,6 +16,7 @@ import { StatusCounterCard } from "../components/StatusCounterCard";
 import { ConfirmationAlertDialog } from "../components/ui/confirmation-alert-dialog";
 import { Combobox } from "../components/ui/combobox";
 import { Input } from "../components/ui/input";
+import { SearchInput } from "../components/ui/search-input";
 import {
   createEquipment,
   deleteEquipment,
@@ -57,6 +58,7 @@ export function EquipmentsAdministrationPage() {
   const navigate = useNavigate(),
     qc = useQueryClient();
   const [filter, setFilter] = useState<Filter>("active"),
+    [search, setSearch] = useState(""),
     [modal, setModal] = useState<Equipment | "new" | null>(null),
     [form, setForm] = useState<Form>(empty),
     [live, setLive] = useState<Equipment | null>(null);
@@ -105,10 +107,14 @@ export function EquipmentsAdministrationPage() {
   );
   const rows = useMemo(
     () =>
-      (items.data ?? []).filter(
-        (x) => filter === "all" || x.administrative_status === filter,
-      ),
-    [items.data, filter],
+      (items.data ?? []).filter((x) => {
+        const term = search.trim().toLocaleLowerCase("pt-BR");
+        const matchesStatus = Boolean(term) || filter === "all" || x.administrative_status === filter;
+        const matchesSearch = !term || [x.external_id, x.kind, names.get(x.space_id) ?? ""]
+          .some((value) => value.toLocaleLowerCase("pt-BR").includes(term));
+        return matchesStatus && matchesSearch;
+      }),
+    [items.data, filter, names, search],
   );
   const counts = {
     active:
@@ -179,7 +185,8 @@ export function EquipmentsAdministrationPage() {
             onClick={() => setFilter("all")}
           />
         </div>
-        <section className="mt-6 overflow-hidden rounded-2xl border bg-white shadow-sm">
+        <SearchInput className="mt-6" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Pesquisar Equipamentos" aria-label="Pesquisar Equipamentos" />
+        <section className="mt-4 overflow-hidden rounded-2xl border bg-white shadow-sm">
           <div className="grid grid-cols-[80px_1fr_110px] border-b bg-slate-50 px-4 py-3 text-xs font-semibold uppercase text-slate-500">
             <span>Tipo</span>
             <span>Descrição</span>

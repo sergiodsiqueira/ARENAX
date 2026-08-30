@@ -27,7 +27,10 @@ permanecer em inglês enquanto os contratos existentes estiverem em vigor.
 - `espacos`: `nome`, `status_administrativo`, `valor_minuto_centavos`.
 - `sessao_espacos`: `sessao_id`, `espaco_id`, `valor_minuto_centavos` como
   fotografia do preço aplicado à Sessão.
-- `clientes`: `nome`, `status_administrativo`.
+- `clientes`: `nome`, `tipo`, `documento`, `cep`, `endereco`, `cidade`, `uf`,
+  `telefone`, `email`, `whatsapp`, `observacoes` em texto livre e
+  `status_administrativo`.
+  `documento` aceita vazio e possui índice único parcial quando informado.
 - `equipamentos`: `espaco_id`, `tipo`, `identificador_externo`, `configuracao`, `status_administrativo`.
 - `momentos`: `sessao_id`, `espaco_id`, `ocorrido_em`, `caminho_replay`.
 - `pagamentos`: `sessao_id`, `valor_centavos`, `metodo`, `observacao`,
@@ -39,7 +42,8 @@ permanecer em inglês enquanto os contratos existentes estiverem em vigor.
 - `acessos`: `usuario_id`, `token_hash`, `criado_em`, `expira_em`, `revogado_em`.
 - `configuracoes`: `duracao_padrao_sessao_minutos`,
   `duracao_replay_anterior_segundos`, `duracao_replay_posterior_segundos`,
-  `calcular_tempo_real`, `atualizado_em`.
+  `calcular_tempo_real`, `retencao_replays_dias` anulável, `cnpj`, `nome_empresa`,
+  `nome_fantasia`, `cep`, `endereco`, `cidade`, `estado`, `telefone`, `atualizado_em`.
 
 ## Configurações iniciais
 

@@ -18,16 +18,16 @@
 | P1 | Momento | Associar Replay à Sessão. |
 | P2 | Pagamento | Registro manual imutável por Sessão. **Implementado.** |
 | P2 | Health Center | Saúde de infraestrutura. |
-| P2 | Arena Designer | Editor visual. |
-| P2 | Configurações | Duração padrão de Sessão e janela anterior/posterior de Replay. |
-| P2 | Compartilhamento | Última entrega do MVP. Forma de acesso e exposição dos Replays será decidida futuramente. |
+| P2 | Configurações | Padrões de Sessão/Replay, retenção sem remoção automática por padrão e diretório local de mídia. |
+| P2 | Compartilhamento | Download e compartilhamento local autenticado, com fallback para WhatsApp sem anexo automático. |
 | P3 | Dashboard TV | Visão ampliada. |
+| Pós-v1 | Arena Designer | Editor visual removido da v1. |
 
 ## Priorização
 Perguntar: a qual contexto pertence? relaciona-se a Sessão? melhora operação? é necessária ao MVP?
 
 ## Decisão de sequenciamento
-O Compartilhamento de Replays, incluindo qualquer link acessível sem autenticação,
-fica como a última entrega do MVP. A arquitetura de acesso — rede local, internet,
-armazenamento em nuvem ou modelo híbrido — ainda não foi decidida e não deve ser
-presumida durante as entregas anteriores.
+O Compartilhamento de Replays fica como a última entrega do MVP. A v1 será instalada
+na máquina local da Arena, funcionará somente na rede local e não oferecerá link
+público. Os arquivos permanecerão em armazenamento local configurável. Validade,
+experiência de entrega e granularidade da auditoria ainda precisam ser fechadas.

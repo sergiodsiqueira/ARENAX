@@ -2,6 +2,7 @@ from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import delete, func, or_, select, update
+from sqlalchemy.exc import IntegrityError
 
 from arenax.domain.identity import User, UserRole, UserStatus
 from arenax.domain.moment import Moment
@@ -198,14 +199,35 @@ class SqlAlchemyUnitOfWork:
     async def commit(self) -> None:
         await self.session.commit()
 
-    async def add_client(self, name: str) -> UUID:
-        model = ClientModel(name=name)
+    async def add_client(
+        self, name: str, client_type: str, document: str, postal_code: str,
+        address: str, city: str, state: str, notes: str,
+        phone: str, email: str, whatsapp: bool,
+        administrative_status: str,
+    ) -> UUID:
+        model = ClientModel(
+            name=name, client_type=client_type, document=document,
+            postal_code=postal_code, address=address, city=city, state=state,
+            notes=notes, administrative_status=administrative_status,
+            phone=phone, email=email, whatsapp=whatsapp,
+        )
         self.session.add(model)
-        await self.session.flush()
+        try:
+            await self.session.flush()
+        except IntegrityError as exc:
+            if "uq_clientes_documento_informado" in str(exc.orig):
+                raise ValueError("Documento já cadastrado para outro Cliente") from exc
+            raise
         return model.id
 
-    async def add_space(self, name: str, minute_rate_cents: int) -> UUID:
-        model = SpaceModel(name=name, minute_rate_cents=minute_rate_cents)
+    async def add_space(
+        self, name: str, minute_rate_cents: int, administrative_status: str
+    ) -> UUID:
+        model = SpaceModel(
+            name=name,
+            minute_rate_cents=minute_rate_cents,
+            administrative_status=administrative_status,
+        )
         self.session.add(model)
         await self.session.flush()
         return model.id
@@ -263,19 +285,39 @@ class SqlAlchemyUnitOfWork:
 
     async def list_clients(self) -> list[dict]:
         models = list(await self.session.scalars(select(ClientModel).order_by(ClientModel.name)))
-        return [{"id": model.id, "name": model.name, "administrative_status": model.administrative_status} for model in models]
+        return [self._client_projection(model) for model in models]
 
     async def get_client(self, client_id: UUID, *, lock: bool = False) -> dict | None:
         query = select(ClientModel).where(ClientModel.id == client_id)
         model = await self.session.scalar(query.with_for_update() if lock else query)
-        return {"id": model.id, "name": model.name, "administrative_status": model.administrative_status} if model else None
+        return self._client_projection(model) if model else None
 
-    async def update_client(self, client_id: UUID, name: str, administrative_status: str) -> dict:
+    async def update_client(
+        self, client_id: UUID, name: str, client_type: str, document: str,
+        postal_code: str, address: str, city: str, state: str,
+        notes: str, phone: str, email: str, whatsapp: bool,
+        administrative_status: str,
+    ) -> dict:
         model = await self.session.get(ClientModel, client_id)
         model.name = name
+        model.client_type = client_type
+        model.document = document
+        model.postal_code = postal_code
+        model.address = address
+        model.city = city
+        model.state = state
+        model.notes = notes
+        model.phone = phone
+        model.email = email
+        model.whatsapp = whatsapp
         model.administrative_status = administrative_status
-        await self.session.flush()
-        return {"id": model.id, "name": model.name, "administrative_status": model.administrative_status}
+        try:
+            await self.session.flush()
+        except IntegrityError as exc:
+            if "uq_clientes_documento_informado" in str(exc.orig):
+                raise ValueError("Documento já cadastrado para outro Cliente") from exc
+            raise
+        return self._client_projection(model)
 
     async def client_has_sessions(self, client_id: UUID) -> bool:
         return await self.session.scalar(
@@ -285,6 +327,24 @@ class SqlAlchemyUnitOfWork:
     async def delete_client(self, client_id: UUID) -> None:
         model = await self.session.get(ClientModel, client_id)
         await self.session.delete(model)
+
+    @staticmethod
+    def _client_projection(model: ClientModel) -> dict:
+        return {
+            "id": model.id,
+            "name": model.name,
+            "client_type": model.client_type,
+            "document": model.document,
+            "postal_code": model.postal_code,
+            "address": model.address,
+            "city": model.city,
+            "state": model.state,
+            "notes": model.notes,
+            "phone": model.phone,
+            "email": model.email,
+            "whatsapp": model.whatsapp,
+            "administrative_status": model.administrative_status,
+        }
 
     async def list_spaces(self) -> list[dict]:
         models = list(await self.session.scalars(select(SpaceModel).order_by(SpaceModel.name)))
@@ -472,6 +532,18 @@ class SqlAlchemyUnitOfWork:
     async def get_moment_replay_path(self, moment_id: UUID) -> str | None:
         return await self.session.scalar(select(MomentModel.replay_path).where(MomentModel.id == moment_id))
 
+    async def get_moment_replay(self, moment_id: UUID, *, lock: bool = False) -> dict | None:
+        query = select(MomentModel).where(MomentModel.id == moment_id)
+        model = await self.session.scalar(query.with_for_update() if lock else query)
+        if model is None:
+            return None
+        return {
+            "id": model.id,
+            "session_id": model.session_id,
+            "status": model.status,
+            "replay_path": model.replay_path,
+        }
+
     async def get_operational_settings(self, *, lock: bool = False) -> dict:
         query = select(OperationalSettingsModel).where(OperationalSettingsModel.id == 1)
         model = await self.session.scalar(query.with_for_update() if lock else query)
@@ -485,6 +557,8 @@ class SqlAlchemyUnitOfWork:
         replay_pre_duration_seconds: int,
         replay_post_duration_seconds: int,
         calculate_actual_time: bool,
+        replay_retention_days: int | None,
+        company: dict[str, str],
         now: datetime,
     ) -> dict:
         model = await self.session.get(OperationalSettingsModel, 1)
@@ -494,6 +568,9 @@ class SqlAlchemyUnitOfWork:
         model.replay_pre_duration_seconds = replay_pre_duration_seconds
         model.replay_post_duration_seconds = replay_post_duration_seconds
         model.calculate_actual_time = calculate_actual_time
+        model.replay_retention_days = replay_retention_days
+        for field, value in company.items():
+            setattr(model, field, value)
         model.updated_at = now
         await self.session.flush()
         return self._settings_projection(model)
@@ -570,5 +647,14 @@ class SqlAlchemyUnitOfWork:
             "replay_pre_duration_seconds": model.replay_pre_duration_seconds,
             "replay_post_duration_seconds": model.replay_post_duration_seconds,
             "calculate_actual_time": model.calculate_actual_time,
+            "replay_retention_days": model.replay_retention_days,
+            "company_tax_id": model.company_tax_id,
+            "company_legal_name": model.company_legal_name,
+            "company_trade_name": model.company_trade_name,
+            "company_address": model.company_address,
+            "company_postal_code": model.company_postal_code,
+            "company_city": model.company_city,
+            "company_state": model.company_state,
+            "company_phone": model.company_phone,
             "updated_at": model.updated_at,
         }

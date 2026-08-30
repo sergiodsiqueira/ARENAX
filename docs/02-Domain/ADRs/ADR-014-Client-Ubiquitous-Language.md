@@ -11,6 +11,23 @@ genérico demais para análise do negócio e navegação administrativa.
 ## Decisão
 - `Cliente` substitui `Pessoa` na linguagem ubíqua, domínio, API, código, banco e UX.
 - Cliente é o cadastro de uma pessoa atendida pela Arena.
+- Cliente possui `Tipo`: `F` para Pessoa Física e `J` para Pessoa Jurídica.
+- `Documento` identifica o Cliente conforme o Tipo. Pessoa Física usa CPF com 11
+  dígitos; Pessoa Jurídica usa CNPJ, inclusive o formato alfanumérico de 2026 com
+  12 letras ou números e 2 dígitos verificadores.
+- Documento é opcional, mas, quando informado, deve ser único entre os Clientes.
+- A máscara pertence à apresentação. CPF e CNPJ são persistidos sem pontuação e
+  o CNPJ é normalizado em maiúsculas.
+- O endereço do Cliente contém CEP, Endereço, Cidade e UF. O CEP é persistido com
+  8 dígitos e a UF com duas letras maiúsculas.
+- Cliente pode possuir Observações em texto livre e um indicador administrativo
+  Ativo/Inativo, aplicável tanto na criação quanto na edição.
+- Cliente pode possuir Telefone e E-mail. O Telefone é persistido somente com
+  dígitos e pode ser marcado, por indicador booleano, como contato de WhatsApp.
+- A busca autenticada pelo OpenCEP sugere Endereço, Cidade e UF; o Usuário pode
+  revisar e complementar os valores antes de salvar.
+- Clientes existentes recebem Tipo `F` e Documento vazio na migration, sem criação
+  de um CPF fictício.
 - Em uma Sessão, um Cliente exerce o papel de `Responsável`.
 - Cliente e Usuário permanecem conceitos separados: Cliente participa da operação;
   Usuário possui credenciais de acesso à plataforma.

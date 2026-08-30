@@ -5,11 +5,13 @@ import {
   CirclePlay,
   Clock3,
   DollarSign,
+  Download,
   Film,
   MapPin,
   Pencil,
   ReceiptText,
   RefreshCw,
+  Share2,
   UserRound,
 } from "lucide-react";
 import {
@@ -28,10 +30,12 @@ import {
   changeExpectedAmount,
   getClients,
   getCurrentUser,
+  getReplayFile,
   getSessionDossier,
   getSpaces,
   recalculateExpectedAmount,
   registerPayment,
+  registerReplayShare,
   replayUrl,
   type PaymentMethod,
   type SessionStatus,
@@ -57,6 +61,8 @@ const eventLabels: Record<string, string> = {
   MomentRequested: "Momento solicitado",
   ReplayGenerated: "Replay gerado",
   ReplayGenerationFailed: "Falha ao gerar Replay",
+  ReplayExpired: "Replay removido pela política de retenção",
+  ReplayShared: "Replay compartilhado",
   PaymentRegistered: "Pagamento registrado",
   ExpectedAmountChanged: "Valor previsto alterado",
   ExpectedAmountRecalculated: "Valor recalculado",
@@ -193,6 +199,38 @@ export function SessionDossierPage() {
           : "Não foi possível recalcular o valor previsto.",
       ),
   });
+  const shareReplay = async (momentId: string) => {
+    try {
+      const file = await getReplayFile(momentId);
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: "Replay ARENAX",
+          text: "Replay da sua Sessão na ARENAX",
+        });
+      } else {
+        const url = URL.createObjectURL(file);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = file.name;
+        anchor.click();
+        URL.revokeObjectURL(url);
+        globalThis.open(
+          "https://wa.me/?text=Replay%20ARENAX%20baixado.%20Anexe%20o%20vídeo%20a%20esta%20conversa.",
+          "_blank",
+          "noopener,noreferrer",
+        );
+      }
+      await registerReplayShare(momentId);
+      toast.success("Compartilhamento registrado na Timeline.");
+      queryClient.invalidateQueries({ queryKey: ["session-dossier", sessionId] });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      toast.error(
+        error instanceof Error ? error.message : "Não foi possível compartilhar o Replay.",
+      );
+    }
+  };
   const submitPayment = (event: FormEvent) => {
     event.preventDefault();
     const normalized = (amount ?? suggestedAmount)
@@ -507,6 +545,8 @@ export function SessionDossierPage() {
                         <p className="mt-2 text-sm">
                           {moment.status === "failed"
                             ? "Falha no processamento"
+                            : moment.status === "expired"
+                              ? "Replay removido pela retenção"
                             : "Replay em processamento"}
                         </p>
                       </div>
@@ -525,6 +565,10 @@ export function SessionDossierPage() {
                       {spaceNames.get(moment.space_id) ?? "Espaço desconhecido"}{" "}
                       · {moment.status}
                     </p>
+                    {moment.status === "ready" && <div className="mt-4 flex gap-2 border-t border-slate-100 pt-4">
+                      <a className="operation-button" href={replayUrl(moment.id)} download><Download size={16} /> Baixar</a>
+                      <button className="operation-button operation-button-primary" type="button" onClick={() => shareReplay(moment.id)}><Share2 size={16} /> Compartilhar</button>
+                    </div>}
                   </div>
                 </article>
               ))}

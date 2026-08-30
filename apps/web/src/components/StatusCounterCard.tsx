@@ -1,4 +1,4 @@
-import { Check, CheckCheck, X } from "lucide-react";
+import { ShieldCheck, ShieldEllipsis, ShieldX } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "../lib/utils";
 
@@ -6,17 +6,17 @@ export type StatusCounterKind = "active" | "inactive" | "all";
 
 const styles = {
   active: {
-    icon: Check,
+    icon: ShieldCheck,
   },
   inactive: {
-    icon: X,
+    icon: ShieldX,
   },
   all: {
-    icon: CheckCheck,
+    icon: ShieldEllipsis,
   },
 } satisfies Record<
   StatusCounterKind,
-  { icon: typeof Check }
+  { icon: typeof ShieldCheck }
 >;
 
 export function StatusCounterCard({
