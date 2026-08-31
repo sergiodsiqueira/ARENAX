@@ -123,8 +123,9 @@ export const createSpace = (input: Pick<Space, "name" | "administrative_status" 
 export const updateSpace = (spaceId: string, input: Pick<Space, "name" | "administrative_status" | "minute_rate_cents">) => apiRequest<Space>(`/api/v1/spaces/${spaceId}`, { method: "PUT", body: JSON.stringify(input) });
 export const deleteSpace = (spaceId: string) => apiRequest<void>(`/api/v1/spaces/${spaceId}`, { method: "DELETE" });
 
-export function getSessions(start: Date, end: Date): Promise<ArenaSession[]> {
+export function getSessions(start: Date, end: Date, spaceId?: string): Promise<ArenaSession[]> {
   const query = new URLSearchParams({ start: start.toISOString(), end: end.toISOString() });
+  if (spaceId) query.set("space_id", spaceId);
   return apiRequest<ArenaSession[]>(`/api/v1/sessions?${query}`);
 }
 

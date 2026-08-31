@@ -6,9 +6,9 @@ import {
   ChevronRight,
   Clock3,
   MapPin,
+  Phone,
   Plus,
   Radio,
-  UserRound,
 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
@@ -18,7 +18,9 @@ import { DatePicker } from "../components/ui/date-picker";
 import { ConfirmationAlertDialog } from "../components/ui/confirmation-alert-dialog";
 import { Combobox } from "../components/ui/combobox";
 import { Checkbox } from "../components/ui/checkbox";
+import { Input } from "../components/ui/input";
 import { SessionSchedulePicker } from "../components/ui/session-schedule-picker";
+import { Textarea } from "../components/ui/textarea";
 import {
   createSession,
   getClients,
@@ -27,7 +29,9 @@ import {
   getSessions,
   getSpaces,
   transitionSession,
+  updateClient,
   type ArenaSession,
+  type Client,
   type SessionStatus,
 } from "../lib/api";
 
@@ -80,6 +84,24 @@ function initialPeriodForDay(day: string) {
   };
 }
 
+function formatPhone(value: string) {
+  return value.replace(/\D/g, "").slice(0, 11)
+    .replace(/^(\d{2})(\d)/, "($1) $2")
+    .replace(/(\d{4,5})(\d{4})$/, "$1-$2");
+}
+
+function formatDuration(start: string, end: string) {
+  const totalMinutes = Math.max(
+    0,
+    Math.ceil((new Date(end).getTime() - new Date(start).getTime()) / 60_000),
+  );
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (!hours) return `${minutes}min`;
+  if (!minutes) return `${hours}h`;
+  return `${hours}h ${minutes}min`;
+}
+
 export function AgendaPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -95,6 +117,9 @@ export function AgendaPage() {
   const [spaceIds, setSpaceIds] = useState<string[]>([]);
   const [period, setPeriod] = useState(initialPeriod);
   const [view, setView] = useState<"day" | "in_progress">("day");
+  const [spaceFilter, setSpaceFilter] = useState("all");
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [clientDraft, setClientDraft] = useState({ name: "", phone: "", email: "", notes: "" });
   const window = useMemo(() => dayWindow(day), [day]);
   const user = useQuery({
     queryKey: ["current-user"],
@@ -104,8 +129,12 @@ export function AgendaPage() {
   const clients = useQuery({ queryKey: ["clients"], queryFn: getClients });
   const spaces = useQuery({ queryKey: ["spaces"], queryFn: getSpaces });
   const sessions = useQuery({
-    queryKey: ["agenda", day],
-    queryFn: () => getSessions(window.start, window.end),
+    queryKey: ["agenda", day, spaceFilter],
+    queryFn: () => getSessions(
+      window.start,
+      window.end,
+      spaceFilter === "all" ? undefined : spaceFilter,
+    ),
   });
   const inProgressSessions = useQuery({
     queryKey: ["agenda-in-progress"],
@@ -178,13 +207,42 @@ export function AgendaPage() {
           : "Não foi possível atualizar a Sessão.",
       ),
   });
-  const clientNames = useMemo(
-    () =>
-      new Map((clients.data ?? []).map((client) => [client.id, client.name])),
+  const saveClient = useMutation({
+    mutationFn: () => {
+      if (!editingClient) throw new Error("Cliente não selecionado.");
+      return updateClient(editingClient.id, {
+        ...editingClient,
+        name: clientDraft.name.trim(),
+        phone: clientDraft.phone.replace(/\D/g, ""),
+        email: clientDraft.email.trim(),
+        notes: clientDraft.notes.trim(),
+      });
+    },
+    onSuccess: (updatedClient) => {
+      queryClient.setQueryData<Client[]>(["clients"], (current = []) =>
+        current.map((client) => client.id === updatedClient.id ? updatedClient : client),
+      );
+      setEditingClient(null);
+      toast.success("Cliente atualizado com sucesso.");
+    },
+    onError: (error) => toast.error(
+      error instanceof Error ? error.message : "Não foi possível atualizar o Cliente.",
+    ),
+  });
+  const clientsById = useMemo(
+    () => new Map((clients.data ?? []).map((client) => [client.id, client])),
     [clients.data],
   );
   const spaceNames = useMemo(
     () => new Map((spaces.data ?? []).map((space) => [space.id, space.name])),
+    [spaces.data],
+  );
+  const spaceFilterOptions = useMemo(
+    () => [
+      { value: "all", label: "Todos os Espaços" },
+      ...(spaces.data ?? [])
+        .map((space) => ({ value: space.id, label: space.name })),
+    ],
     [spaces.data],
   );
   const moveDay = (amount: number) => {
@@ -195,6 +253,17 @@ export function AgendaPage() {
   const openCreateSession = () => {
     setPeriod(initialPeriodForDay(day));
     setCreating(true);
+  };
+  const openClientEdit = (clientId: string) => {
+    const client = clientsById.get(clientId);
+    if (!client) return;
+    setEditingClient(client);
+    setClientDraft({
+      name: client.name,
+      phone: formatPhone(client.phone),
+      email: client.email,
+      notes: client.notes,
+    });
   };
   const valid =
     responsibleId &&
@@ -265,6 +334,24 @@ export function AgendaPage() {
           </button>
         </section> : <section className="mt-7 flex items-center gap-3 rounded-2xl bg-secondary px-5 py-4 text-primary"><span className="grid size-9 place-items-center rounded-xl bg-card"><Radio size={18} /></span><div><p className="font-semibold">Sessões em andamento</p><p className="text-sm text-muted-foreground">Exibindo todas as Sessões atualmente em curso na Arena.</p></div></section>}
 
+        {view === "day" && (
+          <section className="mt-4 flex justify-start">
+            <label className="w-full text-sm font-semibold text-slate-600 sm:w-72">
+              Espaço
+              <Combobox
+                className="mt-2"
+                value={spaceFilter}
+                onValueChange={setSpaceFilter}
+                options={spaceFilterOptions}
+                placeholder="Todos os Espaços"
+                searchPlaceholder="Buscar Espaço..."
+                emptyText="Nenhum Espaço encontrado."
+                disabled={spaces.isLoading}
+              />
+            </label>
+          </section>
+        )}
+
         <section className="mt-5 space-y-3">
           {displayedSessions.isLoading &&
             [1, 2, 3].map((item) => (
@@ -284,7 +371,11 @@ export function AgendaPage() {
               <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
                 <CalendarDays className="mx-auto text-slate-300" size={36} />
                 <p className="mt-3 font-semibold text-slate-600">
-                  {view === "in_progress" ? "Nenhuma Sessão em andamento" : "Nenhuma Sessão neste dia"}
+                  {view === "in_progress"
+                    ? "Nenhuma Sessão em andamento"
+                    : spaceFilter === "all"
+                      ? "Nenhuma Sessão neste dia"
+                      : "Nenhuma Sessão neste Espaço"}
                 </p>
                 {view === "day" && <button
                   className="mt-4 text-sm font-semibold text-emerald-700"
@@ -298,10 +389,8 @@ export function AgendaPage() {
             <SessionCard
               key={session.id}
               session={session}
-              clientName={
-                clientNames.get(session.responsible_client_id) ??
-                "Cliente desconhecido"
-              }
+              clientName={clientsById.get(session.responsible_client_id)?.name ?? "Cliente desconhecido"}
+              clientPhone={clientsById.get(session.responsible_client_id)?.phone ?? ""}
               spaces={session.space_ids.map(
                 (id) => spaceNames.get(id) ?? "Espaço desconhecido",
               )}
@@ -340,9 +429,15 @@ export function AgendaPage() {
                 <Combobox
                   value={responsibleId}
                   onValueChange={setResponsibleId}
-                  options={(clients.data ?? []).map((client) => ({ value: client.id, label: client.name }))}
+                  options={(clients.data ?? []).map((client) => ({
+                    value: client.id,
+                    label: client.name,
+                    detail: client.phone ? formatPhone(client.phone) : "Não informado",
+                    detailIcon: <Phone className="size-3.5" />,
+                  }))}
                   placeholder="Selecione o Cliente"
                   searchPlaceholder="Buscar Cliente..."
+                  onOptionEdit={openClientEdit}
                 />
               </label>
               <fieldset className="mt-5">
@@ -398,6 +493,83 @@ export function AgendaPage() {
             </form>
           </div>
         )}
+
+        {editingClient && (
+          <div className="fixed inset-0 z-[60] overflow-y-auto bg-slate-950/55 px-5 py-8">
+            <form
+              className="mx-auto w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (clientDraft.name.trim()) saveClient.mutate();
+              }}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-semibold">Editar Cliente</h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Atualize os dados de contato sem sair do agendamento.
+                  </p>
+                </div>
+                <button
+                  className="text-sm font-semibold text-slate-500"
+                  type="button"
+                  onClick={() => setEditingClient(null)}
+                >
+                  Fechar
+                </button>
+              </div>
+              <div className="mt-6 grid gap-4">
+                <label className="text-sm font-semibold text-slate-600">
+                  Nome
+                  <Input
+                    className="mt-2"
+                    value={clientDraft.name}
+                    onChange={(event) => setClientDraft((current) => ({ ...current, name: event.target.value }))}
+                  />
+                </label>
+                <label className="text-sm font-semibold text-slate-600">
+                  Telefone
+                  <Input
+                    className="mt-2"
+                    inputMode="tel"
+                    maxLength={15}
+                    placeholder="(00) 00000-0000"
+                    value={clientDraft.phone}
+                    onChange={(event) => setClientDraft((current) => ({ ...current, phone: formatPhone(event.target.value) }))}
+                  />
+                </label>
+                <label className="text-sm font-semibold text-slate-600">
+                  E-mail
+                  <Input
+                    className="mt-2"
+                    type="email"
+                    value={clientDraft.email}
+                    onChange={(event) => setClientDraft((current) => ({ ...current, email: event.target.value }))}
+                  />
+                </label>
+                <label className="text-sm font-semibold text-slate-600">
+                  Observações
+                  <Textarea
+                    className="mt-2"
+                    value={clientDraft.notes}
+                    onChange={(event) => setClientDraft((current) => ({ ...current, notes: event.target.value }))}
+                  />
+                </label>
+              </div>
+              <div className="mt-7 flex justify-end gap-2">
+                <button className="operation-button" type="button" onClick={() => setEditingClient(null)}>
+                  Cancelar
+                </button>
+                <button
+                  className="operation-button operation-button-primary"
+                  disabled={!clientDraft.name.trim() || saveClient.isPending}
+                >
+                  Salvar Cliente
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
       </main>
     </AppShell>
   );
@@ -406,6 +578,7 @@ export function AgendaPage() {
 function SessionCard({
   session,
   clientName,
+  clientPhone,
   spaces,
   onAction,
   pending,
@@ -413,6 +586,7 @@ function SessionCard({
 }: {
   session: ArenaSession;
   clientName: string;
+  clientPhone: string;
   spaces: string[];
   onAction: (action: "confirm" | "start" | "cancel" | "no_show") => void;
   pending: boolean;
@@ -446,8 +620,9 @@ function SessionCard({
               <MapPin size={15} /> {spaces.join(" · ")}
             </p>
             <p className="mt-1 flex items-center gap-2 text-xs text-slate-400">
-              <UserRound size={14} /> Responsável · <Clock3 size={14} /> período
-              previsto
+              <Phone size={14} /> {clientPhone ? formatPhone(clientPhone) : "Telefone não informado"}
+              <span aria-hidden="true">·</span>
+              <Clock3 size={14} /> {formatDuration(session.scheduled_start, session.scheduled_end)}
             </p>
           </div>
         </div>

@@ -32,10 +32,14 @@ export function DatePicker({
   value,
   onChange,
   markedDates = new Set<string>(),
+  className,
+  triggerClassName,
 }: {
   value: string;
   onChange: (value: string) => void;
   markedDates?: ReadonlySet<string>;
+  className?: string;
+  triggerClassName?: string;
 }) {
   const selected = useMemo(() => parseDate(value), [value]);
   const [visibleMonth, setVisibleMonth] = useState(
@@ -62,10 +66,11 @@ export function DatePicker({
   };
 
   return (
-    <div className="relative" ref={root}>
+    <div className={cn("relative", className)} ref={root}>
       <Button
+        type="button"
         variant="ghost"
-        className="h-10 gap-2 px-3 font-semibold text-primary"
+        className={cn("h-10 gap-2 px-3 font-semibold text-primary", triggerClassName)}
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
@@ -77,11 +82,11 @@ export function DatePicker({
       {open && (
         <div className="absolute top-full left-1/2 z-40 mt-2 w-[292px] -translate-x-1/2 rounded-2xl border border-border bg-card p-4 shadow-xl" role="dialog" aria-label="Escolher data">
           <div className="mb-3 flex items-center justify-between">
-            <Button variant="ghost" size="icon" className="size-8" onClick={() => moveMonth(-1)} aria-label="Mês anterior"><ChevronLeft size={17} /></Button>
+            <Button type="button" variant="ghost" size="icon" className="size-8" onClick={() => moveMonth(-1)} aria-label="Mês anterior"><ChevronLeft size={17} /></Button>
             <p className="text-sm font-semibold capitalize text-foreground">
               {new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(visibleMonth)}
             </p>
-            <Button variant="ghost" size="icon" className="size-8" onClick={() => moveMonth(1)} aria-label="Próximo mês"><ChevronRight size={17} /></Button>
+            <Button type="button" variant="ghost" size="icon" className="size-8" onClick={() => moveMonth(1)} aria-label="Próximo mês"><ChevronRight size={17} /></Button>
           </div>
 
           <div className="grid grid-cols-7" role="grid">

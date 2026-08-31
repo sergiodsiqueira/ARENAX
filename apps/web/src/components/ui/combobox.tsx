@@ -1,12 +1,17 @@
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { Command as CommandPrimitive } from "cmdk";
-import { Check, ChevronsUpDown, Search } from "lucide-react";
-import { useState } from "react";
+import { Check, ChevronsUpDown, Pencil, Search } from "lucide-react";
+import { type ReactNode, useState } from "react";
 
 import { cn } from "../../lib/utils";
 import { Button } from "./button";
 
-export type ComboboxOption = { value: string; label: string };
+export type ComboboxOption = {
+  value: string;
+  label: string;
+  detail?: string;
+  detailIcon?: ReactNode;
+};
 
 export function Combobox({
   value,
@@ -17,6 +22,7 @@ export function Combobox({
   emptyText = "Nenhuma opção encontrada.",
   disabled = false,
   className,
+  onOptionEdit,
 }: {
   value: string;
   onValueChange: (value: string) => void;
@@ -26,6 +32,7 @@ export function Combobox({
   emptyText?: string;
   disabled?: boolean;
   className?: string;
+  onOptionEdit?: (value: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const selected = options.find((option) => option.value === value);
@@ -61,7 +68,7 @@ export function Combobox({
               {options.map((option) => (
                 <CommandPrimitive.Item
                   key={option.value}
-                  value={`${option.label} ${option.value}`}
+                  value={`${option.label} ${option.detail ?? ""} ${option.value}`}
                   onSelect={() => {
                     onValueChange(option.value);
                     setOpen(false);
@@ -69,7 +76,30 @@ export function Combobox({
                   className="relative flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm outline-none data-[selected=true]:bg-accent data-[selected=true]:text-accent-foreground"
                 >
                   <Check className={cn("size-4", value === option.value ? "opacity-100" : "opacity-0")} />
-                  <span className="truncate">{option.label}</span>
+                  <span className="min-w-0 flex-1 truncate">
+                    {option.label}
+                    {option.detail && (
+                      <span className="ml-2 inline-flex items-center gap-1 text-xs font-normal text-muted-foreground">
+                        {option.detailIcon}
+                        {option.detail}
+                      </span>
+                    )}
+                  </span>
+                  {onOptionEdit && (
+                    <button
+                      type="button"
+                      className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      aria-label={`Editar ${option.label}`}
+                      onPointerDown={(event) => event.preventDefault()}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setOpen(false);
+                        onOptionEdit(option.value);
+                      }}
+                    >
+                      <Pencil className="size-3.5" />
+                    </button>
+                  )}
                 </CommandPrimitive.Item>
               ))}
             </CommandPrimitive.List>
