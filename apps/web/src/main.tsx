@@ -14,6 +14,7 @@ import { SessionDossierPage } from "./pages/SessionDossierPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { HealthCenterPage } from "./pages/HealthCenterPage";
 import { Toaster } from "./components/ui/sonner";
+import { LicenseGuard } from "./components/LicenseGuard";
 import "./styles.css";
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: true } } });
@@ -22,6 +23,7 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
     <BrowserRouter>
+      <LicenseGuard>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
           <Route path="/mission-control" element={<MissionControlPlaceholder />} />
@@ -37,6 +39,7 @@ createRoot(document.getElementById("root")!).render(
           <Route path="/administracao/clientes" element={<Navigate to="/cadastros/clientes" replace />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
+      </LicenseGuard>
       <Toaster />
     </BrowserRouter>
     </QueryClientProvider>

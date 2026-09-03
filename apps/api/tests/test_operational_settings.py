@@ -14,6 +14,9 @@ COMPANY = {
     "company_city": "São Paulo",
     "company_state": "SP",
     "company_phone": "11999998888",
+    "ax_device_network_interface_id": "12",
+    "ax_device_network_interface_name": "Ethernet",
+    "ax_device_network_address": "192.168.1.10",
 }
 
 
@@ -63,6 +66,7 @@ async def test_updates_operational_settings_atomically():
     assert result["replay_pre_duration_seconds"] == 20
     assert result["calculate_actual_time"] is False
     assert result["replay_retention_days"] == 30
+    assert result["ax_device_network_address"] == "192.168.1.10"
     assert uow.locked and uow.committed
 
 
@@ -98,3 +102,13 @@ async def test_normalizes_alphanumeric_company_tax_id():
         60, 30, 5, True, None, company, NOW
     )
     assert result["company_tax_id"] == "SFORFB0FZKZA06"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("address", ["localhost", "127.0.0.1", "169.254.1.20", "::1"])
+async def test_rejects_network_address_unreachable_by_ax_device(address):
+    company = {**COMPANY, "ax_device_network_address": address}
+    with pytest.raises(ValueError):
+        await ArenaInfrastructureService(lambda: SettingsUnitOfWork()).update_operational_settings(
+            60, 30, 5, True, None, company, NOW
+        )

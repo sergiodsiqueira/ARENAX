@@ -1,3 +1,4 @@
+import ipaddress
 from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
@@ -325,20 +326,25 @@ class ArenaInfrastructureService:
             await uow.commit()
 
     async def create_equipment(
-        self, space_id: UUID, kind: str, external_id: str, configuration: dict
+        self, space_id: UUID, kind: str, external_id: str, description: str, configuration: dict
     ) -> UUID:
         external_id = self._validate_equipment(kind, external_id, configuration)
+        description = description.strip()
         async with self._uow_factory() as uow:
             if not await uow.get_space(space_id):
                 raise EntityNotFound("Espaço não encontrado")
-            entity_id = await uow.add_equipment(space_id, kind, external_id, configuration)
+            entity_id = await uow.add_equipment(
+                space_id, kind, external_id, description, configuration
+            )
             await uow.commit()
             return entity_id
 
     async def update_equipment(
-        self, equipment_id: UUID, space_id: UUID, kind: str, external_id: str, configuration: dict, administrative_status: str = "active"
+        self, equipment_id: UUID, space_id: UUID, kind: str, external_id: str,
+        description: str, configuration: dict, administrative_status: str = "active"
     ) -> dict:
         external_id = self._validate_equipment(kind, external_id, configuration)
+        description = description.strip()
         self._validate_binary_status(administrative_status, "Equipamento")
         async with self._uow_factory() as uow:
             if not await uow.get_equipment(equipment_id, lock=True):
@@ -346,7 +352,8 @@ class ArenaInfrastructureService:
             if not await uow.get_space(space_id):
                 raise EntityNotFound("Espaço não encontrado")
             equipment = await uow.update_equipment(
-                equipment_id, space_id, kind, external_id, configuration, administrative_status
+                equipment_id, space_id, kind, external_id, description,
+                configuration, administrative_status
             )
             await uow.commit()
             return equipment
@@ -507,6 +514,19 @@ class ArenaInfrastructureService:
             if character.isdigit()
         )
         normalized_company["company_state"] = normalized_company.get("company_state", "").upper()
+        network_address = normalized_company.get("ax_device_network_address", "")
+        if network_address:
+            try:
+                parsed_address = ipaddress.ip_address(network_address)
+            except ValueError as exc:
+                raise ValueError("O endereço da interface de rede é inválido") from exc
+            if (
+                parsed_address.version != 4
+                or parsed_address.is_loopback
+                or parsed_address.is_link_local
+                or parsed_address.is_unspecified
+            ):
+                raise ValueError("Selecione uma interface IPv4 acessível na rede local")
         tax_id = normalized_company["company_tax_id"]
         if tax_id and (
             len(tax_id) != 14 or not tax_id[:12].isalnum() or not tax_id[-2:].isdigit()

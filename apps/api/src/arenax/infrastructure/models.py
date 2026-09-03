@@ -1,10 +1,11 @@
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
     JSON,
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -81,6 +82,15 @@ class OperationalSettingsModel(Base):
     company_city: Mapped[str] = mapped_column("cidade", String(120), default="")
     company_state: Mapped[str] = mapped_column("estado", String(2), default="")
     company_phone: Mapped[str] = mapped_column("telefone", String(11), default="")
+    ax_device_network_interface_id: Mapped[str] = mapped_column(
+        "interface_rede_ax_device_id", String(120), default=""
+    )
+    ax_device_network_interface_name: Mapped[str] = mapped_column(
+        "interface_rede_ax_device_nome", String(160), default=""
+    )
+    ax_device_network_address: Mapped[str] = mapped_column(
+        "endereco_rede_ax_device", String(45), default=""
+    )
     updated_at: Mapped[datetime] = mapped_column(
         "atualizado_em", DateTime(timezone=True)
     )
@@ -140,6 +150,7 @@ class EquipmentModel(Base):
     space_id: Mapped[UUID] = mapped_column("espaco_id", ForeignKey("espacos.id"), index=True)
     kind: Mapped[str] = mapped_column("tipo", String(30))
     external_id: Mapped[str] = mapped_column("identificador_externo", String(100), unique=True)
+    description: Mapped[str] = mapped_column("descricao", String(160), default="")
     configuration: Mapped[dict] = mapped_column("configuracao", JSON, default=dict)
     administrative_status: Mapped[str] = mapped_column("status_administrativo", String(20), default="active")
 
@@ -240,6 +251,25 @@ class OutboxModel(Base):
     published_at: Mapped[datetime | None] = mapped_column(
         "publicado_em", DateTime(timezone=True)
     )
+
+
+class LicenseStateModel(Base):
+    __tablename__ = "estado_licenca"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    installation_started_at: Mapped[datetime] = mapped_column(
+        "instalacao_iniciada_em", DateTime(timezone=True)
+    )
+    tax_id: Mapped[str] = mapped_column("cnpj", String(14), default="")
+    allowed: Mapped[bool | None] = mapped_column("liberado", Boolean, nullable=True)
+    valid_until: Mapped[date | None] = mapped_column("validade", Date, nullable=True)
+    customer_name: Mapped[str] = mapped_column("cliente", String(180), default="")
+    next_check_at: Mapped[datetime | None] = mapped_column(
+        "verificar_novamente_em", DateTime(timezone=True), nullable=True
+    )
+    last_checked_at: Mapped[datetime | None] = mapped_column(
+        "ultima_verificacao_em", DateTime(timezone=True), nullable=True
+    )
+    last_error: Mapped[str] = mapped_column("ultimo_erro", String(500), default="")
 
 
 class UserModel(Base):

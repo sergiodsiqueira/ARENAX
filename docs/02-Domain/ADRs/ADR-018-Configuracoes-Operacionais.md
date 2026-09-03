@@ -35,6 +35,12 @@ valores são globais para a única Arena atendida pelo MVP.
 - A tela apresenta o diretório local de mídia e permite solicitar sua troca. A
   mudança física depende do componente local de instalação e só se torna efetiva
   após validação e aplicação da montagem compartilhada pelos processos de vídeo.
+- A tela lista, por meio do ARENAX Local Agent, as interfaces IPv4 ativas da
+  máquina host. Proprietário ou Administrador escolhe a interface conectada à
+  rede dos AX Devices; identificador, nome e endereço ficam persistidos em
+  Configurações e compõem a URL de acionamento exibida no Health Center.
+- Endereços de loopback, como `localhost` e `127.0.0.1`, e endereços link-local
+  não podem ser usados para configurar AX Devices.
 - A duração padrão da Sessão é uma sugestão para a criação. A Sessão continua
   persistindo `inicio_previsto` e `fim_previsto`, e o operador pode ajustar o
   período antes de salvar.

@@ -13,6 +13,7 @@ import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { AppShell } from "../components/AppShell";
 import { StatusCounterCard } from "../components/StatusCounterCard";
+import { Checkbox } from "../components/ui/checkbox";
 import { ConfirmationAlertDialog } from "../components/ui/confirmation-alert-dialog";
 import { Combobox } from "../components/ui/combobox";
 import { Input } from "../components/ui/input";
@@ -23,6 +24,7 @@ import {
   getCameraLive,
   getCurrentUser,
   getEquipments,
+  getHealthCenter,
   getSpaces,
   updateEquipment,
   type Equipment,
@@ -32,6 +34,7 @@ type Form = {
   spaceId: string;
   kind: Equipment["kind"];
   externalId: string;
+  description: string;
   captureUrl: string;
   status: Equipment["administrative_status"];
 };
@@ -39,6 +42,7 @@ const empty: Form = {
   spaceId: "",
   kind: "camera",
   externalId: "",
+  description: "",
   captureUrl: "",
   status: "active",
 };
@@ -50,6 +54,7 @@ const payload = (f: Form, old?: Equipment): Omit<Equipment, "id"> => {
     space_id: f.spaceId,
     kind: f.kind,
     external_id: f.externalId.trim(),
+    description: f.description.trim(),
     configuration,
     administrative_status: f.status,
   };
@@ -71,6 +76,11 @@ export function EquipmentsAdministrationPage() {
     items = useQuery({
       queryKey: ["equipments"],
       queryFn: () => getEquipments(),
+    }),
+    health = useQuery({
+      queryKey: ["health-center"],
+      queryFn: getHealthCenter,
+      enabled: Boolean(user.data),
     });
   useEffect(() => {
     if (user.isError) navigate("/login", { replace: true });
@@ -110,7 +120,7 @@ export function EquipmentsAdministrationPage() {
       (items.data ?? []).filter((x) => {
         const term = search.trim().toLocaleLowerCase("pt-BR");
         const matchesStatus = Boolean(term) || filter === "all" || x.administrative_status === filter;
-        const matchesSearch = !term || [x.external_id, x.kind, names.get(x.space_id) ?? ""]
+        const matchesSearch = !term || [x.external_id, x.description, x.kind, names.get(x.space_id) ?? ""]
           .some((value) => value.toLocaleLowerCase("pt-BR").includes(term));
         return matchesStatus && matchesSearch;
       }),
@@ -134,6 +144,7 @@ export function EquipmentsAdministrationPage() {
             spaceId: x.space_id,
             kind: x.kind,
             externalId: x.external_id,
+            description: x.description,
             captureUrl: String(x.configuration.capture_url ?? ""),
             status: x.administrative_status,
           },
@@ -143,6 +154,31 @@ export function EquipmentsAdministrationPage() {
     form.spaceId &&
     form.externalId.trim() &&
     (form.kind === "ax_device" || form.captureUrl.trim());
+  const copyAxDeviceUrl = async () => {
+    const url = health.data?.ax_device_api_url;
+    if (!url) {
+      toast.error("Selecione a rede dos AX Devices na tela de Configurações.");
+      return;
+    }
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = url;
+        textArea.style.position = "fixed";
+        textArea.style.opacity = "0";
+        document.body.appendChild(textArea);
+        textArea.select();
+        const copied = document.execCommand("copy");
+        textArea.remove();
+        if (!copied) throw new Error("Copy command failed");
+      }
+      toast.success("Link do AX Device copiado.");
+    } catch {
+      toast.error("Não foi possível copiar o link.");
+    }
+  };
   return (
     <AppShell user={user.data}>
       <main className="mx-auto max-w-7xl px-5 py-8 sm:px-8">
@@ -187,25 +223,39 @@ export function EquipmentsAdministrationPage() {
         </div>
         <SearchInput className="mt-6" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Pesquisar Equipamentos" aria-label="Pesquisar Equipamentos" />
         <section className="mt-4 overflow-hidden rounded-2xl border bg-white shadow-sm">
-          <div className="grid grid-cols-[80px_1fr_110px] border-b bg-slate-50 px-4 py-3 text-xs font-semibold uppercase text-slate-500">
+          <div className="grid grid-cols-[80px_minmax(140px,0.8fr)_minmax(180px,1.2fr)_140px] border-b bg-slate-50 px-4 py-3 text-xs font-semibold uppercase text-slate-500">
             <span>Tipo</span>
+            <span>ID</span>
             <span>Descrição</span>
             <span>Ações</span>
           </div>
           {rows.map((x) => (
             <div
               key={x.id}
-              className="grid grid-cols-[80px_1fr_110px] items-center border-b px-4 py-4 last:border-0"
+              className="grid grid-cols-[80px_minmax(140px,0.8fr)_minmax(180px,1.2fr)_140px] items-center border-b px-4 py-4 last:border-0"
             >
               {x.kind === "camera" ? (
-                <button className="text-emerald-700" onClick={() => setLive(x)}>
+                <button
+                  className="w-fit rounded-lg p-2 text-emerald-700 hover:bg-emerald-50"
+                  onClick={() => setLive(x)}
+                  aria-label={`Abrir transmissão ao vivo de ${x.external_id}`}
+                  title="Abrir Câmera ao vivo"
+                >
                   <Camera />
                 </button>
               ) : (
-                <Radio className="text-emerald-700" />
+                <button
+                  className="w-fit rounded-lg p-2 text-emerald-700 hover:bg-emerald-50"
+                  onClick={copyAxDeviceUrl}
+                  aria-label={`Copiar link de configuração de ${x.external_id}`}
+                  title="Copiar link do AX Device"
+                >
+                  <Radio />
+                </button>
               )}
+              <p className="font-semibold">{x.external_id}</p>
               <div>
-                <p className="font-semibold">{x.external_id}</p>
+                <p className="font-medium text-slate-700">{x.description || "Sem descrição"}</p>
                 <p className="text-xs text-slate-400">
                   {x.kind === "camera" ? "Câmera" : "AX Device"} ·{" "}
                   {names.get(x.space_id)} ·{" "}
@@ -270,21 +320,32 @@ export function EquipmentsAdministrationPage() {
                   />
                 </label>
                 <label className="text-sm font-semibold">
-                  Descrição
+                  ID
                   <Input
                     className="mt-2"
+                    maxLength={100}
+                    placeholder={form.kind === "ax_device" ? "Ex.: AX-QUADRA-01" : "Ex.: CAM-QUADRA-01"}
                     value={form.externalId}
                     onChange={(e) =>
                       setForm({ ...form, externalId: e.target.value })
                     }
                   />
                 </label>
-                <label className="text-sm font-semibold">
-                  Estado
-                  <Combobox
-                    value={form.status}
-                    onValueChange={(value) => setForm({ ...form, status: value as Equipment["administrative_status"] })}
-                    options={[{ value: "active", label: "Ativo" }, { value: "inactive", label: "Inativo" }]}
+                <label className="flex cursor-pointer items-center gap-3 self-end pb-3 text-sm font-semibold">
+                  <Checkbox
+                    checked={form.status === "active"}
+                    onCheckedChange={(checked) => setForm({ ...form, status: checked === true ? "active" : "inactive" })}
+                  />
+                  Ativo
+                </label>
+                <label className="text-sm font-semibold sm:col-span-2">
+                  Descrição
+                  <Input
+                    className="mt-2"
+                    maxLength={160}
+                    placeholder="Ex.: Botão da quadra principal"
+                    value={form.description}
+                    onChange={(e) => setForm({ ...form, description: e.target.value })}
                   />
                 </label>
                 {form.kind === "camera" && (

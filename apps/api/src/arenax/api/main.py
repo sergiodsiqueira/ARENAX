@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
 from arenax.application.auth import AuthenticationService, UserAdministrationService
+from arenax.application.license import LicenseService
 from arenax.application.use_cases import (
     ArenaInfrastructureService,
     PaymentService,
@@ -27,6 +28,7 @@ from arenax.domain.errors import (
 from arenax.domain.identity import User, UserRole, UserStatus
 from arenax.infrastructure.config import settings
 from arenax.infrastructure.health_center import (
+    ax_device_api_url,
     overall_status,
     probe_database,
     probe_http,
@@ -35,6 +37,7 @@ from arenax.infrastructure.health_center import (
     storage_health,
 )
 from arenax.infrastructure.host_agent import HostAgentClient, HostAgentUnavailable
+from arenax.infrastructure.license import LicenseGateway, SqlAlchemyLicenseRepository
 from arenax.infrastructure.live_gateway import LiveGatewayUnavailable, MediaMtxGateway
 from arenax.infrastructure.operational_events import operational_events
 from arenax.infrastructure.postal_code import OpenCepClient, PostalCodeLookupError
@@ -64,10 +67,12 @@ from .schemas import (
     ExpectedAmountResponse,
     ExtendSessionRequest,
     HealthCenterResponse,
+    LicenseStatusResponse,
     LoginRequest,
     LoginResponse,
     NamedResourceRequest,
     NamedResourceResponse,
+    NetworkInterfaceResponse,
     OperationalSettingsInput,
     OperationalSettingsResponse,
     PaymentResponse,
@@ -85,13 +90,6 @@ from .schemas import (
 )
 
 app = FastAPI(title="ARENAX API", version="0.1.0")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[settings.web_origin],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 sessions = SessionService(SqlAlchemyUnitOfWork)
 physical_events = PhysicalEventService(SqlAlchemyUnitOfWork)
 payments = PaymentService(SqlAlchemyUnitOfWork)
@@ -109,6 +107,42 @@ live_gateway = MediaMtxGateway(
 )
 host_agent = HostAgentClient(settings.host_agent_url, settings.host_agent_secret)
 postal_codes = OpenCepClient(settings.open_cep_url)
+license_service = LicenseService(
+    SqlAlchemyLicenseRepository(), LicenseGateway(settings.license_api_url)
+)
+
+LICENSE_EXEMPT_PATHS = {
+    "/api/v1/health",
+    "/api/v1/license-status",
+    "/api/v1/auth/login",
+    "/api/v1/auth/logout",
+    "/api/v1/auth/me",
+    "/docs",
+    "/openapi.json",
+}
+
+
+@app.middleware("http")
+async def enforce_license(request: Request, call_next):
+    if request.method == "OPTIONS" or request.url.path in LICENSE_EXEMPT_PATHS:
+        return await call_next(request)
+    decision = await license_service.status(datetime.now(UTC))
+    if not decision.allowed:
+        return JSONResponse(
+            status_code=423,
+            content={"code": "LicenseBlocked", "message": "Licença da ARENAX bloqueada"},
+        )
+    return await call_next(request)
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[settings.web_origin],
+    allow_origin_regex=settings.web_origin_regex,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.exception_handler(DomainError)
@@ -132,6 +166,22 @@ async def value_error_handler(_, exc: ValueError):
 @app.get("/api/v1/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/api/v1/license-status", response_model=LicenseStatusResponse)
+async def license_status():
+    decision = await license_service.status(datetime.now(UTC))
+    return LicenseStatusResponse(
+        allowed=decision.allowed,
+        reason=decision.reason,
+        customer_name=decision.customer_name,
+        valid_until=decision.valid_until,
+        grace_until=decision.grace_until,
+        next_check_at=decision.next_check_at,
+        support_company="W Sistemas Inteligentes",
+        support_whatsapp="+55 19 99777-8318",
+        support_email="wsinteligentes@gmail.com",
+    )
 
 
 def user_response(user) -> UserResponse:
@@ -283,6 +333,9 @@ async def update_operational_settings(
             "company_city": request.company_city,
             "company_state": request.company_state,
             "company_phone": request.company_phone,
+            "ax_device_network_interface_id": request.ax_device_network_interface_id,
+            "ax_device_network_interface_name": request.ax_device_network_interface_name,
+            "ax_device_network_address": request.ax_device_network_address,
         },
         datetime.now(UTC),
     )
@@ -301,6 +354,14 @@ async def lookup_postal_code(postal_code: str, _user: AuthenticatedUser):
 async def select_storage_folder(_user: AdministratorUser):
     try:
         return await host_agent.select_folder()
+    except HostAgentUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.get("/api/v1/network-interfaces", response_model=list[NetworkInterfaceResponse])
+async def get_network_interfaces(_user: AdministratorUser):
+    try:
+        return await host_agent.network_interfaces()
     except HostAgentUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
@@ -403,7 +464,8 @@ async def create_equipment(
 ):
     try:
         entity_id = await infrastructure.create_equipment(
-            request.space_id, request.kind, request.external_id, request.configuration
+            request.space_id, request.kind, request.external_id,
+            request.description, request.configuration
         )
         return {"id": entity_id}
     except ValueError as exc:
@@ -426,6 +488,7 @@ async def update_equipment(
         request.space_id,
         request.kind,
         request.external_id,
+        request.description,
         request.configuration,
         request.administrative_status,
     )
@@ -489,7 +552,10 @@ async def health_center(_user: AuthenticatedUser):
         },
         storage_health(media_root, now),
     ]
-    spaces = {item["id"]: item["name"] for item in await infrastructure.list_spaces()}
+    operational_settings, space_items = await asyncio.gather(
+        infrastructure.get_operational_settings(), infrastructure.list_spaces()
+    )
+    spaces = {item["id"]: item["name"] for item in space_items}
     cameras = []
     for equipment in await infrastructure.list_equipments():
         if equipment["kind"] != "camera":
@@ -511,7 +577,13 @@ async def health_center(_user: AuthenticatedUser):
     relevant_cameras = [item for item in cameras if item["administrative_status"] == "active"]
     aggregate_items = services + relevant_cameras
     return HealthCenterResponse(
-        status=overall_status(aggregate_items), checked_at=now, services=services, cameras=cameras
+        status=overall_status(aggregate_items),
+        checked_at=now,
+        ax_device_api_url=ax_device_api_url(
+            operational_settings["ax_device_network_address"]
+        ),
+        services=services,
+        cameras=cameras,
     )
 
 

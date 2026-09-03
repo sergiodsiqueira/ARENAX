@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
@@ -50,6 +50,7 @@ class EquipmentRequest(BaseModel):
     space_id: UUID
     kind: str
     external_id: str = Field(min_length=1, max_length=100)
+    description: str = Field(default="", max_length=160)
     configuration: dict = Field(default_factory=dict)
     administrative_status: Literal["active", "inactive"] = "active"
 
@@ -116,6 +117,7 @@ class EquipmentResponse(BaseModel):
     space_id: UUID
     kind: str
     external_id: str
+    description: str
     configuration: dict
     administrative_status: str
 
@@ -193,8 +195,21 @@ class CameraHealthItemResponse(BaseModel):
 class HealthCenterResponse(BaseModel):
     status: str
     checked_at: datetime
+    ax_device_api_url: str | None = None
     services: list[HealthItemResponse]
     cameras: list[CameraHealthItemResponse]
+
+
+class LicenseStatusResponse(BaseModel):
+    allowed: bool
+    reason: str
+    customer_name: str
+    valid_until: date | None = None
+    grace_until: datetime
+    next_check_at: datetime | None = None
+    support_company: str
+    support_whatsapp: str
+    support_email: str
 
 
 class CameraLiveResponse(BaseModel):
@@ -215,6 +230,9 @@ class OperationalSettingsInput(BaseModel):
     company_city: str = Field(default="", max_length=120)
     company_state: str = Field(default="", max_length=2)
     company_phone: str = Field(default="", max_length=15)
+    ax_device_network_interface_id: str = Field(default="", max_length=120)
+    ax_device_network_interface_name: str = Field(default="", max_length=160)
+    ax_device_network_address: str = Field(default="", max_length=45)
 
 
 class OperationalSettingsResponse(OperationalSettingsInput):
@@ -234,6 +252,12 @@ class ApplyStorageFolderRequest(BaseModel):
 class StorageChangeResponse(BaseModel):
     accepted: bool
     path: str
+
+
+class NetworkInterfaceResponse(BaseModel):
+    id: str
+    name: str
+    address: str
 
 
 class PostalCodeResponse(BaseModel):

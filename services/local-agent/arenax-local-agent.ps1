@@ -63,6 +63,25 @@ try {
                 continue
             }
 
+            if ($context.Request.HttpMethod -eq "GET" -and $route -eq "/network-interfaces") {
+                $interfaces = @(Get-NetIPConfiguration | Where-Object {
+                    $_.NetAdapter.Status -eq "Up" -and $_.IPv4Address
+                } | ForEach-Object {
+                    $configuration = $_
+                    $configuration.IPv4Address | Where-Object {
+                        $_.IPAddress -notlike "127.*" -and $_.IPAddress -notlike "169.254.*"
+                    } | ForEach-Object {
+                        @{
+                            id = [string]$configuration.InterfaceIndex
+                            name = [string]$configuration.InterfaceAlias
+                            address = [string]$_.IPAddress
+                        }
+                    }
+                } | Sort-Object name, address)
+                Send-Json $context.Response 200 @{ interfaces = $interfaces }
+                continue
+            }
+
             if ($context.Request.HttpMethod -eq "POST" -and $route -eq "/select-folder") {
                 $dialog = [System.Windows.Forms.FolderBrowserDialog]::new()
                 $dialog.Description = "Escolha onde os Replays da ARENAX serão armazenados"

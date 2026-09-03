@@ -1,7 +1,7 @@
 import json
 from datetime import UTC, datetime, timedelta
 
-from arenax.infrastructure.health_center import overall_status, read_heartbeat
+from arenax.infrastructure.health_center import ax_device_api_url, overall_status, read_heartbeat
 
 NOW = datetime(2026, 8, 30, 15, tzinfo=UTC)
 
@@ -40,3 +40,16 @@ def test_overall_status_prioritizes_unavailable_then_attention():
     assert overall_status([{"status": "healthy"}, {"status": "unknown"}]) == "attention"
     assert overall_status([{"status": "degraded"}]) == "attention"
     assert overall_status([{"status": "unknown"}, {"status": "unavailable"}]) == "critical"
+
+
+def test_ax_device_url_rejects_addresses_that_point_to_the_device_itself():
+    assert ax_device_api_url("localhost") is None
+    assert ax_device_api_url("127.0.0.1") is None
+    assert ax_device_api_url("::1") is None
+    assert ax_device_api_url("169.254.10.20") is None
+
+
+def test_ax_device_url_accepts_server_address_on_local_network():
+    assert ax_device_api_url("192.168.1.10") == (
+        "http://192.168.1.10:8000/api/v1/events/button-pressed"
+    )

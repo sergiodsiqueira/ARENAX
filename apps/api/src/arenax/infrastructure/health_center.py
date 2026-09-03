@@ -1,4 +1,5 @@
 import asyncio
+import ipaddress
 import json
 import shutil
 from collections.abc import Awaitable, Callable
@@ -13,6 +14,24 @@ from sqlalchemy.exc import SQLAlchemyError
 from .database import engine
 
 Probe = Callable[[], Awaitable[None]]
+
+
+def ax_device_api_url(network_address: str) -> str | None:
+    address = network_address.strip()
+    if not address:
+        return None
+    try:
+        parsed_address = ipaddress.ip_address(address)
+    except ValueError:
+        return None
+    if (
+        parsed_address.version != 4
+        or parsed_address.is_loopback
+        or parsed_address.is_link_local
+        or parsed_address.is_unspecified
+    ):
+        return None
+    return f"http://{address}:8000/api/v1/events/button-pressed"
 
 
 def _age_seconds(checked_at: datetime | None, now: datetime) -> float | None:

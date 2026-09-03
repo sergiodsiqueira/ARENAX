@@ -1,5 +1,17 @@
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+function resolveApiUrl(): string {
+  const configuredUrl = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+  const url = new URL(configuredUrl, window.location.origin);
+  const apiUsesLoopback = ["localhost", "127.0.0.1", "::1"].includes(url.hostname);
+  const webUsesLoopback = ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
 
+  if (apiUsesLoopback && !webUsesLoopback) {
+    url.hostname = window.location.hostname;
+  }
+
+  return url.toString().replace(/\/$/, "");
+}
+
+const API_URL = resolveApiUrl();
 type LoginInput = {
   email: string;
   password: string;
@@ -114,6 +126,21 @@ export async function getCurrentUser(): Promise<AuthenticatedUser> {
   return response.json() as Promise<AuthenticatedUser>;
 }
 
+export type LicenseStatus = {
+  allowed: boolean;
+  reason: "license_active" | "initial_offline_grace" | "license_blocked" | "license_expired" | "license_unverified";
+  customer_name: string;
+  valid_until: string | null;
+  grace_until: string;
+  next_check_at: string | null;
+  support_company: string;
+  support_whatsapp: string;
+  support_email: string;
+};
+
+export const getLicenseStatus = () =>
+  apiRequest<LicenseStatus>("/api/v1/license-status");
+
 export const getSpaces = () => apiRequest<Space[]>("/api/v1/spaces");
 export const getClients = () => apiRequest<Client[]>("/api/v1/clients");
 export const createClient = (input: Omit<Client, "id">) => apiRequest<{ id: string }>("/api/v1/clients", { method: "POST", body: JSON.stringify(input) });
@@ -166,7 +193,7 @@ export function resetUserPassword(userId: string, password: string) {
   return apiRequest<void>(`/api/v1/users/${userId}/reset-password`, { method: "POST", body: JSON.stringify({ password }) });
 }
 
-export type Equipment = { id: string; space_id: string; kind: "camera" | "ax_device"; external_id: string; configuration: Record<string, unknown>; administrative_status: "active" | "inactive" };
+export type Equipment = { id: string; space_id: string; kind: "camera" | "ax_device"; external_id: string; description: string; configuration: Record<string, unknown>; administrative_status: "active" | "inactive" };
 export type SessionMoment = {
   id: string;
   space_id: string;
@@ -229,6 +256,9 @@ export type OperationalSettings = {
   company_city: string;
   company_state: string;
   company_phone: string;
+  ax_device_network_interface_id: string;
+  ax_device_network_interface_name: string;
+  ax_device_network_address: string;
   media_storage_path: string;
   updated_at: string;
 };
@@ -243,6 +273,11 @@ export const updateOperationalSettings = (input: OperationalSettingsInput) =>
     method: "PUT",
     body: JSON.stringify(input),
   });
+
+export type NetworkInterface = { id: string; name: string; address: string };
+
+export const getNetworkInterfaces = () =>
+  apiRequest<NetworkInterface[]>("/api/v1/network-interfaces");
 
 export const selectReplayStorageFolder = () =>
   apiRequest<{ path: string | null; cancelled: boolean }>("/api/v1/storage/select-folder", {
@@ -291,6 +326,7 @@ export type CameraHealthItem = {
 export type HealthCenter = {
   status: "healthy" | "attention" | "critical";
   checked_at: string;
+  ax_device_api_url: string | null;
   services: HealthService[];
   cameras: CameraHealthItem[];
 };

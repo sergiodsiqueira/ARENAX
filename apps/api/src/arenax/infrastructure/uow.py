@@ -255,9 +255,9 @@ class SqlAlchemyUnitOfWork:
         model = await self.session.get(SpaceModel, space_id)
         await self.session.delete(model)
 
-    async def add_equipment(self, space_id, kind, external_id, configuration) -> UUID:
+    async def add_equipment(self, space_id, kind, external_id, description, configuration) -> UUID:
         model = EquipmentModel(space_id=space_id, kind=kind, external_id=external_id,
-                               configuration=configuration)
+                               description=description, configuration=configuration)
         self.session.add(model)
         await self.session.flush()
         return model.id
@@ -268,12 +268,14 @@ class SqlAlchemyUnitOfWork:
         return self._equipment_projection(model) if model else None
 
     async def update_equipment(
-        self, equipment_id: UUID, space_id: UUID, kind: str, external_id: str, configuration: dict, administrative_status: str
+        self, equipment_id: UUID, space_id: UUID, kind: str, external_id: str,
+        description: str, configuration: dict, administrative_status: str
     ) -> dict:
         model = await self.session.get(EquipmentModel, equipment_id)
         model.space_id = space_id
         model.kind = kind
         model.external_id = external_id
+        model.description = description
         model.configuration = configuration
         model.administrative_status = administrative_status
         await self.session.flush()
@@ -636,6 +638,7 @@ class SqlAlchemyUnitOfWork:
             "space_id": model.space_id,
             "kind": model.kind,
             "external_id": model.external_id,
+            "description": model.description,
             "configuration": model.configuration,
             "administrative_status": model.administrative_status,
         }
@@ -656,5 +659,8 @@ class SqlAlchemyUnitOfWork:
             "company_city": model.company_city,
             "company_state": model.company_state,
             "company_phone": model.company_phone,
+            "ax_device_network_interface_id": model.ax_device_network_interface_id,
+            "ax_device_network_interface_name": model.ax_device_network_interface_name,
+            "ax_device_network_address": model.ax_device_network_address,
             "updated_at": model.updated_at,
         }

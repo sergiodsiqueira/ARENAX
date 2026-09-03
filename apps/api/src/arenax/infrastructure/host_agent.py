@@ -19,6 +19,10 @@ class HostAgentClient:
     async def select_folder(self) -> dict:
         return await asyncio.to_thread(self._request, "POST", "/select-folder", {}, 300)
 
+    async def network_interfaces(self) -> list[dict]:
+        result = await asyncio.to_thread(self._request, "GET", "/network-interfaces", None, 5)
+        return list(result.get("interfaces", []))
+
     async def apply_storage(self, path: str) -> dict:
         return await asyncio.to_thread(
             self._request, "POST", "/apply-storage", {"path": path}, 10

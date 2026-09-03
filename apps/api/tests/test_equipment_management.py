@@ -18,10 +18,11 @@ class EquipmentUnitOfWork:
         return self.equipment if self.equipment and self.equipment["id"] == equipment_id else None
     async def get_space(self, space_id, **_):
         return self.space if self.space and self.space["id"] == space_id else None
-    async def update_equipment(self, equipment_id, space_id, kind, external_id, configuration, status):
+    async def update_equipment(self, equipment_id, space_id, kind, external_id, description, configuration, status):
         self.equipment = {
             "id": equipment_id, "space_id": space_id, "kind": kind,
-            "external_id": external_id, "configuration": configuration,
+            "external_id": external_id, "description": description,
+            "configuration": configuration,
             "administrative_status": status,
         }
         return self.equipment
@@ -35,10 +36,11 @@ async def test_updates_equipment_and_can_move_it_to_another_space():
     space = {"id": uuid4(), "name": "Society"}
     uow = EquipmentUnitOfWork(equipment, space)
     result = await ArenaInfrastructureService(lambda: uow).update_equipment(
-        equipment["id"], space["id"], "camera", " camera-01 ",
+        equipment["id"], space["id"], "camera", " camera-01 ", " Câmera principal ",
         {"capture_url": "rtsp://camera/live"},
     )
     assert result["external_id"] == "camera-01"
+    assert result["description"] == "Câmera principal"
     assert result["space_id"] == space["id"]
     assert uow.committed
 
@@ -47,7 +49,7 @@ async def test_updates_equipment_and_can_move_it_to_another_space():
 async def test_camera_requires_capture_url():
     with pytest.raises(ValueError, match="URL de captura"):
         await ArenaInfrastructureService(lambda: EquipmentUnitOfWork()).update_equipment(
-            uuid4(), uuid4(), "camera", "camera-01", {}
+            uuid4(), uuid4(), "camera", "camera-01", "Principal", {}
         )
 
 

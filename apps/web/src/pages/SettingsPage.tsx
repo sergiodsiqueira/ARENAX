@@ -1,14 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, Clock3, FolderOpen, HardDrive, Settings, Video } from "lucide-react";
+import { Building2, Clock3, FolderOpen, HardDrive, Network, RefreshCw, Settings, Video } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { AppShell } from "../components/AppShell";
 import { Button } from "../components/ui/button";
 import { Checkbox } from "../components/ui/checkbox";
+import { Combobox } from "../components/ui/combobox";
 import { ConfirmationAlertDialog } from "../components/ui/confirmation-alert-dialog";
 import { Input } from "../components/ui/input";
-import { applyReplayStorageFolder, getCurrentUser, getOperationalSettings, lookupPostalCode, selectReplayStorageFolder, updateOperationalSettings } from "../lib/api";
+import { applyReplayStorageFolder, getCurrentUser, getNetworkInterfaces, getOperationalSettings, lookupPostalCode, selectReplayStorageFolder, updateOperationalSettings } from "../lib/api";
 
 type FormValues = {
   sessionMinutes: string;
@@ -25,6 +26,7 @@ type FormValues = {
   companyCity: string;
   companyState: string;
   companyPhone: string;
+  axDeviceNetworkInterfaceId: string;
 };
 
 const onlyDigits = (value: string) => value.replace(/\D/g, "");
@@ -56,6 +58,12 @@ export function SettingsPage() {
     queryFn: getOperationalSettings,
     enabled: Boolean(currentUser.data && currentUser.data.role !== "operador"),
   });
+  const networkInterfaces = useQuery({
+    queryKey: ["network-interfaces"],
+    queryFn: getNetworkInterfaces,
+    enabled: Boolean(currentUser.data && currentUser.data.role !== "operador"),
+    retry: false,
+  });
 
   useEffect(() => {
     if (currentUser.isError || currentUser.data?.role === "operador") navigate("/mission-control", { replace: true });
@@ -76,7 +84,23 @@ export function SettingsPage() {
     companyCity: settings.data?.company_city ?? "",
     companyState: settings.data?.company_state ?? "",
     companyPhone: formatPhone(settings.data?.company_phone ?? ""),
+    axDeviceNetworkInterfaceId: settings.data?.ax_device_network_interface_id ?? "",
   };
+  const networkOptions = (networkInterfaces.data ?? []).map((item) => ({
+    value: item.id,
+    label: item.name,
+    detail: item.address,
+  }));
+  if (
+    displayedForm.axDeviceNetworkInterfaceId
+    && !networkOptions.some((item) => item.value === displayedForm.axDeviceNetworkInterfaceId)
+  ) {
+    networkOptions.push({
+      value: displayedForm.axDeviceNetworkInterfaceId,
+      label: settings.data?.ax_device_network_interface_name || "Interface indisponível",
+      detail: settings.data?.ax_device_network_address || "Sem endereço IPv4",
+    });
+  }
 
   const values = {
     sessionMinutes: Number(displayedForm.sessionMinutes),
@@ -92,6 +116,7 @@ export function SettingsPage() {
     companyCity: displayedForm.companyCity.trim(),
     companyState: displayedForm.companyState.trim().toUpperCase(),
     companyPhone: onlyDigits(displayedForm.companyPhone),
+    axDeviceNetworkInterfaceId: displayedForm.axDeviceNetworkInterfaceId,
   };
   const valid = Number.isInteger(values.sessionMinutes) && values.sessionMinutes > 0
     && Number.isInteger(values.replayPreSeconds) && values.replayPreSeconds >= 0
@@ -117,6 +142,7 @@ export function SettingsPage() {
     || values.companyCity !== settings.data.company_city
     || values.companyState !== settings.data.company_state
     || values.companyPhone !== settings.data.company_phone
+    || values.axDeviceNetworkInterfaceId !== settings.data.ax_device_network_interface_id
   );
 
   useEffect(() => {
@@ -143,6 +169,9 @@ export function SettingsPage() {
       company_city: values.companyCity,
       company_state: values.companyState,
       company_phone: values.companyPhone,
+      ax_device_network_interface_id: values.axDeviceNetworkInterfaceId,
+      ax_device_network_interface_name: networkInterfaces.data?.find((item) => item.id === values.axDeviceNetworkInterfaceId)?.name ?? settings.data?.ax_device_network_interface_name ?? "",
+      ax_device_network_address: networkInterfaces.data?.find((item) => item.id === values.axDeviceNetworkInterfaceId)?.address ?? settings.data?.ax_device_network_address ?? "",
     }),
     onSuccess: (result) => {
       queryClient.setQueryData(["operational-settings"], result);
@@ -232,6 +261,30 @@ export function SettingsPage() {
             <label className="flex flex-col text-sm font-semibold text-slate-600">UF<Input className="mt-2 w-24 uppercase" maxLength={2} placeholder="SP" value={displayedForm.companyState} onChange={(event) => setForm({ ...displayedForm, companyState: event.target.value.replace(/[^a-z]/gi, "").slice(0, 2).toUpperCase() })} /></label>
           </div>
           {!companyValid && <p className="mt-3 text-xs text-rose-700">Confira o CNPJ (12 letras ou números e 2 dígitos verificadores), o CEP (8 dígitos), o telefone (10 ou 11 dígitos) e a UF (2 letras).</p>}
+        </section>
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:col-span-2">
+          <span className="inline-flex rounded-xl bg-emerald-50 p-2.5 text-emerald-700"><Network size={21} /></span>
+          <h2 className="mt-4 text-lg font-semibold">Rede dos AX Devices</h2>
+          <p className="mt-2 text-sm text-slate-500">Escolha a interface da máquina ARENAX conectada à mesma rede dos AX Devices.</p>
+          <div className="mt-6 max-w-xl">
+            <label className="text-sm font-semibold text-slate-600">
+              Interface de rede
+              <Combobox
+                value={displayedForm.axDeviceNetworkInterfaceId}
+                onValueChange={(value) => setForm({ ...displayedForm, axDeviceNetworkInterfaceId: value })}
+                options={networkOptions}
+                placeholder={networkInterfaces.isLoading ? "Detectando interfaces..." : "Selecione uma interface"}
+                searchPlaceholder="Buscar interface..."
+                emptyText="Nenhuma interface IPv4 ativa foi encontrada."
+                disabled={networkInterfaces.isLoading}
+              />
+            </label>
+            <Button type="button" variant="ghost" className="mt-2" disabled={networkInterfaces.isFetching} onClick={() => networkInterfaces.refetch()}>
+              <RefreshCw className={networkInterfaces.isFetching ? "animate-spin" : ""} size={16} /> Detectar novamente
+            </Button>
+          </div>
+          {networkInterfaces.isError && <p className="mt-3 text-xs text-rose-700">Não foi possível consultar as interfaces. Verifique se o ARENAX Local Agent está ativo.</p>}
+          {settings.data.ax_device_network_address && <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Endereço atual do AX Device</p><code className="mt-1 block break-all text-xs text-slate-700">http://{settings.data.ax_device_network_address}:8000/api/v1/events/button-pressed</code></div>}
         </section>
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:col-span-2">
           <span className="inline-flex rounded-xl bg-emerald-50 p-2.5 text-emerald-700"><HardDrive size={21} /></span>

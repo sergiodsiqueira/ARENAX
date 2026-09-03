@@ -32,3 +32,5 @@ Responsável. Participantes detalhados ficam fora do MVP.
 
 ## Equipamento
 Hardware físico. Tipos iniciais: Câmera IP e AX Device. Futuramente: placar, iluminação, catraca e sensores.
+Possui um ID técnico único, usado nas integrações, e uma Descrição amigável
+independente para identificação operacional.

@@ -5,6 +5,15 @@ info:
 security:
   - cookieAuth: []
 paths:
+  /api/v1/license-status:
+    get:
+      security: []
+      operationId: getLicenseStatus
+      summary: Informa se a instalação está autorizada a operar.
+      responses:
+        '200':
+          description: Decisão atual, baseada na consulta remota ou no estado persistido.
+          content: {application/json: {schema: {$ref: '#/components/schemas/LicenseStatus'}}}
   /api/v1/health-center:
     get:
       operationId: getHealthCenter
@@ -98,6 +107,14 @@ paths:
       summary: Ask the interactive Windows agent to open the native folder picker.
       responses:
         '200': {description: Selected folder or a cancelled selection, content: {application/json: {schema: {$ref: '#/components/schemas/StorageFolderSelection'}}}}
+        '403': {description: Administrative permission required}
+        '503': {description: Local Agent is not installed, configured or available}
+  /api/v1/network-interfaces:
+    get:
+      operationId: listHostNetworkInterfaces
+      summary: List active host IPv4 interfaces detected by the ARENAX Local Agent.
+      responses:
+        '200': {description: Active network interfaces, content: {application/json: {schema: {type: array, items: {$ref: '#/components/schemas/NetworkInterface'}}}}}
         '403': {description: Administrative permission required}
         '503': {description: Local Agent is not installed, configured or available}
   /api/v1/postal-codes/{postalCode}:
@@ -388,6 +405,21 @@ components:
       description: Domain invariant rejected the intention
       content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
   schemas:
+    LicenseStatus:
+      type: object
+      required: [allowed, reason, grace_until, support_company, support_whatsapp, support_email]
+      properties:
+        allowed: {type: boolean}
+        reason:
+          type: string
+          enum: [license_active, license_blocked, license_expired, initial_offline_grace, license_unverified]
+        customer_name: {type: string}
+        valid_until: {type: [string, 'null'], format: date}
+        grace_until: {type: string, format: date-time}
+        next_check_at: {type: [string, 'null'], format: date-time}
+        support_company: {type: string}
+        support_whatsapp: {type: string}
+        support_email: {type: string, format: email}
     OperationalEvent:
       type: object
       required: [resource, occurred_at]
@@ -528,6 +560,7 @@ components:
         space_id: {type: string, format: uuid}
         kind: {type: string, enum: [camera, ax_device]}
         external_id: {type: string}
+        description: {type: string, maxLength: 160, default: ''}
         configuration: {type: object}
         administrative_status: {type: string, enum: [active, inactive], default: active}
     CameraHealth:
@@ -569,10 +602,14 @@ components:
         detail: {type: [string, 'null']}
     HealthCenter:
       type: object
-      required: [status, checked_at, services, cameras]
+      required: [status, checked_at, ax_device_api_url, services, cameras]
       properties:
         status: {type: string, enum: [healthy, attention, critical]}
         checked_at: {type: string, format: date-time}
+        ax_device_api_url:
+          type: [string, 'null']
+          format: uri
+          description: URL configured for AX Devices to publish button press events on the Arena local network.
         services: {type: array, items: {$ref: '#/components/schemas/HealthItem'}}
         cameras: {type: array, items: {$ref: '#/components/schemas/CameraHealthItem'}}
     OperationalSettingsInput:
@@ -595,6 +632,16 @@ components:
         company_city: {type: string, maxLength: 120}
         company_state: {type: string, pattern: '^$|^[A-Z]{2}$'}
         company_phone: {type: string, pattern: '^$|^[0-9]{10,11}$'}
+        ax_device_network_interface_id: {type: string, maxLength: 120}
+        ax_device_network_interface_name: {type: string, maxLength: 160}
+        ax_device_network_address: {type: string, maxLength: 45}
+    NetworkInterface:
+      type: object
+      required: [id, name, address]
+      properties:
+        id: {type: string}
+        name: {type: string}
+        address: {type: string, format: ipv4}
     OperationalSettings:
       allOf:
         - {$ref: '#/components/schemas/OperationalSettingsInput'}

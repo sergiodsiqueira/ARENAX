@@ -13,4 +13,9 @@ URL RTSP; Sessão; quantidade de câmeras; duração do Replay; armazenamento; c
 POST /api/v1/events/button-pressed
 ```
 
+Em Configurações, o Administrador seleciona uma interface IPv4 ativa detectada
+pelo ARENAX Local Agent. A API persiste a seleção e monta a URL completa exibida
+no Health Center. `localhost`, loopback e endereços locais automáticos não são
+aceitos, pois no AX Device apontariam para o próprio dispositivo.
+
 Ethernet é preferível quando viável; Wi-Fi é alternativa.
