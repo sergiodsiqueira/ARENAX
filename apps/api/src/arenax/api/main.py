@@ -178,6 +178,7 @@ async def license_status():
         valid_until=decision.valid_until,
         grace_until=decision.grace_until,
         next_check_at=decision.next_check_at,
+        check_status=decision.check_status,
         support_company="W Sistemas Inteligentes",
         support_whatsapp="+55 19 99777-8318",
         support_email="wsinteligentes@gmail.com",
@@ -569,6 +570,7 @@ async def health_center(_user: AuthenticatedUser):
         cameras.append({
             "camera_id": equipment["id"],
             "external_id": equipment["external_id"],
+            "description": equipment["description"],
             "space_id": equipment["space_id"],
             "space_name": spaces.get(equipment["space_id"], "Espaço desconhecido"),
             "administrative_status": equipment["administrative_status"],

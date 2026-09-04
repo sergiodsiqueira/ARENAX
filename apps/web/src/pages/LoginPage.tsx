@@ -77,9 +77,12 @@ export function LoginPage() {
 
       <section className="flex min-h-screen items-center justify-center px-6 py-10 sm:px-12 lg:px-16">
         <div className="w-full max-w-[430px]">
-          <a className="mb-16 flex w-fit items-center gap-3 lg:hidden" href="/login" aria-label="ARENAX">
-            <span className="logo-mark logo-mark-dark" aria-hidden="true"><span /></span>
-            <span className="text-lg font-extrabold tracking-[0.22em]">ARENAX</span>
+          <a className="mx-auto mb-12 block w-fit lg:hidden" href="/login" aria-label="ArenaX">
+            <img
+              className="h-[12.6rem] w-auto object-contain"
+              src="/branding/LOGOTIPO_TRANSPARENTE.png"
+              alt="ArenaX"
+            />
           </a>
 
           <div className="mb-10">

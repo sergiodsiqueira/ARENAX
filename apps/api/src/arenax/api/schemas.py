@@ -184,6 +184,7 @@ class HealthItemResponse(BaseModel):
 class CameraHealthItemResponse(BaseModel):
     camera_id: UUID
     external_id: str
+    description: str
     space_id: UUID
     space_name: str
     administrative_status: str
@@ -207,6 +208,7 @@ class LicenseStatusResponse(BaseModel):
     valid_until: date | None = None
     grace_until: datetime
     next_check_at: datetime | None = None
+    check_status: Literal["consulted", "not_consulted", "unavailable"]
     support_company: str
     support_whatsapp: str
     support_email: str

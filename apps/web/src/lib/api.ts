@@ -133,6 +133,7 @@ export type LicenseStatus = {
   valid_until: string | null;
   grace_until: string;
   next_check_at: string | null;
+  check_status: "consulted" | "not_consulted" | "unavailable";
   support_company: string;
   support_whatsapp: string;
   support_email: string;
@@ -316,6 +317,7 @@ export type HealthService = {
 export type CameraHealthItem = {
   camera_id: string;
   external_id: string;
+  description: string;
   space_id: string;
   space_name: string;
   administrative_status: "active" | "inactive";

@@ -1,27 +1,27 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Camera,
-  ExternalLink,
   Pencil,
   Plus,
   Radio,
   Trash2,
-  X,
 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { AppShell } from "../components/AppShell";
+import { CameraLiveModal } from "../components/CameraLiveModal";
 import { StatusCounterCard } from "../components/StatusCounterCard";
 import { Checkbox } from "../components/ui/checkbox";
 import { ConfirmationAlertDialog } from "../components/ui/confirmation-alert-dialog";
 import { Combobox } from "../components/ui/combobox";
 import { Input } from "../components/ui/input";
+import { ModalCloseButton } from "../components/ui/modal-close-button";
+import { useModalEscape } from "../hooks/use-modal-escape";
 import { SearchInput } from "../components/ui/search-input";
 import {
   createEquipment,
   deleteEquipment,
-  getCameraLive,
   getCurrentUser,
   getEquipments,
   getHealthCenter,
@@ -67,6 +67,7 @@ export function EquipmentsAdministrationPage() {
     [modal, setModal] = useState<Equipment | "new" | null>(null),
     [form, setForm] = useState<Form>(empty),
     [live, setLive] = useState<Equipment | null>(null);
+  useModalEscape(Boolean(modal) && !live, () => setModal(null));
   const user = useQuery({
       queryKey: ["current-user"],
       queryFn: getCurrentUser,
@@ -295,11 +296,7 @@ export function EquipmentsAdministrationPage() {
                 save.mutate();
               }}
             >
-              <h2 className="text-xl font-semibold">
-                {modal === "new"
-                  ? "Cadastrar Equipamento"
-                  : "Editar Equipamento"}
-              </h2>
+              <div className="flex items-start justify-between gap-4"><h2 className="text-xl font-semibold">{modal === "new" ? "Cadastrar Equipamento" : "Editar Equipamento"}</h2><ModalCloseButton onClick={() => setModal(null)} /></div>
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
                 <label className="text-sm font-semibold">
                   Espaço
@@ -381,67 +378,13 @@ export function EquipmentsAdministrationPage() {
         )}
         {live && (
           <CameraLiveModal
-            camera={live}
+            cameraId={live.id}
+            cameraName={live.description || live.external_id}
             spaceName={names.get(live.space_id) ?? "Espaço"}
             onClose={() => setLive(null)}
           />
         )}
       </main>
     </AppShell>
-  );
-}
-function CameraLiveModal({
-  camera,
-  spaceName,
-  onClose,
-}: {
-  camera: Equipment;
-  spaceName: string;
-  onClose: () => void;
-}) {
-  const live = useQuery({
-    queryKey: ["camera-live", camera.id],
-    queryFn: () => getCameraLive(camera.id),
-    retry: 1,
-  });
-  return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/75 px-4">
-      <section className="w-full max-w-5xl overflow-hidden rounded-2xl bg-white">
-        <header className="flex justify-between p-4">
-          <div>
-            <h2 className="font-semibold">{camera.external_id} · Ao vivo</h2>
-            <p className="text-sm text-slate-500">{spaceName}</p>
-          </div>
-          <button onClick={onClose}>
-            <X />
-          </button>
-        </header>
-        {live.data ? (
-          <iframe
-            className="aspect-video w-full bg-black"
-            src={live.data.url}
-            allow="autoplay; fullscreen"
-          />
-        ) : (
-          <div className="grid aspect-video place-items-center bg-slate-950 text-white">
-            {live.isLoading
-              ? "Conectando…"
-              : live.error instanceof Error
-                ? live.error.message
-                : "Indisponível"}
-          </div>
-        )}
-        {live.data && (
-          <a
-            className="flex items-center gap-1 p-3 text-sm text-emerald-700"
-            href={live.data.url}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Abrir em nova aba <ExternalLink size={14} />
-          </a>
-        )}
-      </section>
-    </div>
   );
 }

@@ -8,6 +8,8 @@ import { StatusCounterCard } from "../components/StatusCounterCard";
 import { ConfirmationAlertDialog } from "../components/ui/confirmation-alert-dialog";
 import { Checkbox } from "../components/ui/checkbox";
 import { Input } from "../components/ui/input";
+import { ModalCloseButton } from "../components/ui/modal-close-button";
+import { useModalEscape } from "../hooks/use-modal-escape";
 import { SearchInput } from "../components/ui/search-input";
 import {
   createSpace,
@@ -28,6 +30,7 @@ export function SpacesAdministrationPage() {
     [name, setName] = useState(""),
     [minuteRate, setMinuteRate] = useState(""),
     [status, setStatus] = useState("active");
+  useModalEscape(Boolean(modal), () => setModal(null));
   const user = useQuery({
       queryKey: ["current-user"],
       queryFn: getCurrentUser,
@@ -180,9 +183,7 @@ export function SpacesAdministrationPage() {
                 save.mutate();
               }}
             >
-              <h2 className="text-xl font-semibold">
-                {modal === "new" ? "Cadastrar Espaço" : "Editar Espaço"}
-              </h2>
+              <div className="flex items-start justify-between gap-4"><h2 className="text-xl font-semibold">{modal === "new" ? "Cadastrar Espaço" : "Editar Espaço"}</h2><ModalCloseButton onClick={() => setModal(null)} /></div>
               <label className="mt-5 block text-sm font-semibold">
                 Descrição
                 <Input

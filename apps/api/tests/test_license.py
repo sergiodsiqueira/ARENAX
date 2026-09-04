@@ -28,6 +28,7 @@ def test_first_offline_initialization_has_two_day_grace():
     assert decision.allowed
     assert decision.reason == "initial_offline_grace"
     assert decision.grace_until == NOW - timedelta(hours=1) + timedelta(days=2)
+    assert decision.check_status == "not_consulted"
 
 
 def test_unverified_installation_blocks_after_grace():
@@ -110,6 +111,7 @@ async def test_online_result_is_cached_until_requested_interval():
     assert decision.allowed
     assert gateway.calls == 1
     assert repository.current_state.next_check_at == NOW + timedelta(hours=1)
+    assert decision.check_status == "consulted"
 
 
 @pytest.mark.asyncio
@@ -119,3 +121,4 @@ async def test_offline_failure_keeps_initial_grace_and_schedules_retry():
     decision = await LicenseService(repository, gateway).status(NOW)
     assert decision.allowed
     assert repository.failure[1] == NOW + timedelta(minutes=5)
+    assert decision.check_status == "unavailable"

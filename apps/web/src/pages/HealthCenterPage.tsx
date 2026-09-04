@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { Activity, Camera, Check, CircleAlert, Copy, Database, HardDrive, Radio, RefreshCw, Server, Video } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { AppShell } from "../components/AppShell";
+import { CameraLiveModal } from "../components/CameraLiveModal";
 import { Button } from "../components/ui/button";
-import { getCurrentUser, getHealthCenter, type HealthStatus } from "../lib/api";
+import { getCurrentUser, getHealthCenter, type CameraHealthItem, type HealthStatus } from "../lib/api";
 
 const statusInfo: Record<HealthStatus, { label: string; classes: string; dot: string }> = {
   healthy: { label: "Saudável", classes: "bg-emerald-50 text-emerald-800", dot: "bg-emerald-500" },
@@ -28,6 +29,7 @@ function StatusBadge({ status }: { status: HealthStatus }) {
 
 export function HealthCenterPage() {
   const navigate = useNavigate();
+  const [liveCamera, setLiveCamera] = useState<CameraHealthItem | null>(null);
   const user = useQuery({ queryKey: ["current-user"], queryFn: getCurrentUser, retry: false });
   const health = useQuery({
     queryKey: ["health-center"],
@@ -61,7 +63,7 @@ export function HealthCenterPage() {
   return <AppShell user={user.data}>
     <main className="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-10">
       <header className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
-        <div><p className="flex items-center gap-2 text-sm font-semibold text-emerald-700"><Activity size={17} /> OPERAÇÃO</p><h1 className="mt-2 text-3xl font-semibold tracking-tight">Health Center</h1><p className="mt-2 text-slate-500">Saúde dos serviços e equipamentos que sustentam a operação da Arena.</p></div>
+        <div><p className="text-sm font-semibold text-emerald-700">OPERAÇÃO</p><h1 className="mt-2 text-3xl font-semibold tracking-tight">Health Center</h1><p className="mt-2 text-slate-500">Saúde dos serviços e equipamentos que sustentam a operação da Arena.</p></div>
         <Button variant="outline" onClick={() => health.refetch()} disabled={health.isFetching}><RefreshCw className={health.isFetching ? "animate-spin" : ""} size={16} /> Atualizar</Button>
       </header>
 
@@ -75,7 +77,8 @@ export function HealthCenterPage() {
 
         <section className="mt-8"><h2 className="text-lg font-semibold">Serviços e infraestrutura</h2><div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">{health.data.services.map((service) => { const Icon = icons[service.name as keyof typeof icons] ?? Server; return <article key={service.name} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-start justify-between gap-3"><span className="rounded-xl bg-emerald-50 p-2.5 text-emerald-700"><Icon size={21} /></span><StatusBadge status={service.status} /></div><h3 className="mt-4 font-semibold">{service.label}</h3><p className="mt-1 min-h-5 text-xs text-slate-500">{service.detail ?? formatDate(service.checked_at)}</p>{service.name === "api" && <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-xs font-medium text-slate-600">Endereço para configurar o AX Device</p><div className="mt-2 flex items-center gap-2"><code className="min-w-0 flex-1 select-all break-all text-xs text-slate-700">{axDeviceUrl}</code><Button type="button" variant="outline" size="icon" className="shrink-0" onClick={copyAxDeviceUrl} aria-label="Copiar endereço do AX Device" title="Copiar endereço"><Copy size={15} /><Check className="hidden" size={15} /></Button></div></div>}{service.name === "storage" && <div className="mt-4"><div className="mb-2 flex justify-between text-xs text-slate-500"><span>{service.used_percent ?? 0}% utilizado</span><span>{formatBytes(service.free_bytes)} livres</span></div><div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full ${(service.used_percent ?? 0) >= 90 ? "bg-amber-500" : "bg-emerald-500"}`} style={{ width: `${Math.min(service.used_percent ?? 0, 100)}%` }} /></div></div>}{service.response_time_ms !== null && <p className="mt-3 text-xs text-slate-400">Resposta em {service.response_time_ms} ms</p>}</article>; })}</div></section>
 
-        <section className="mt-8"><div className="flex items-end justify-between"><div><h2 className="text-lg font-semibold">Câmeras por Espaço</h2><p className="mt-1 text-sm text-slate-500">O sinal indica se a captura contínua está disponível para gerar Replays.</p></div><span className="text-sm text-slate-500">{activeCameras.length} ativa{activeCameras.length !== 1 ? "s" : ""}</span></div><div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">{health.data.cameras.map((camera) => <div key={camera.camera_id} className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 last:border-0 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-3"><span className="rounded-xl bg-slate-50 p-2.5 text-emerald-700"><Camera size={20} /></span><div><p className="font-semibold">{camera.external_id}</p><p className="text-xs text-slate-500">{camera.space_name} · {camera.detail ?? formatDate(camera.checked_at)}</p></div></div><StatusBadge status={camera.status} /></div>)}{health.data.cameras.length === 0 && <p className="p-10 text-center text-slate-500">Nenhuma Câmera cadastrada.</p>}</div></section>
+        <section className="mt-8"><div className="flex items-end justify-between"><div><h2 className="text-lg font-semibold">Câmeras por Espaço</h2><p className="mt-1 text-sm text-slate-500">O sinal indica se a captura contínua está disponível para gerar Replays.</p></div><span className="text-sm text-slate-500">{activeCameras.length} ativa{activeCameras.length !== 1 ? "s" : ""}</span></div><div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">{health.data.cameras.map((camera) => <div key={camera.camera_id} className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 last:border-0 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-3"><button type="button" className="cursor-pointer rounded-xl bg-slate-50 p-2.5 text-emerald-700 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" onClick={() => setLiveCamera(camera)} aria-label={`Abrir transmissão ao vivo de ${camera.description || camera.external_id}`} title="Abrir Câmera ao vivo"><Camera size={20} /></button><div><p className="font-semibold">{camera.description || camera.external_id}</p><p className="text-xs text-slate-500">{camera.space_name} · {camera.detail ?? formatDate(camera.checked_at)}</p></div></div><StatusBadge status={camera.status} /></div>)}{health.data.cameras.length === 0 && <p className="p-10 text-center text-slate-500">Nenhuma Câmera cadastrada.</p>}</div></section>
+        {liveCamera && <CameraLiveModal cameraId={liveCamera.camera_id} cameraName={liveCamera.description || liveCamera.external_id} spaceName={liveCamera.space_name} onClose={() => setLiveCamera(null)} />}
       </>}
     </main>
   </AppShell>;

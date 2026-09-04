@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, Clock3, FolderOpen, HardDrive, Network, RefreshCw, Settings, Video } from "lucide-react";
+import { Building2, Clock3, CloudAlert, CloudCheck, CloudOff, FolderOpen, HardDrive, Network, RefreshCw, Video } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
@@ -9,7 +9,7 @@ import { Checkbox } from "../components/ui/checkbox";
 import { Combobox } from "../components/ui/combobox";
 import { ConfirmationAlertDialog } from "../components/ui/confirmation-alert-dialog";
 import { Input } from "../components/ui/input";
-import { applyReplayStorageFolder, getCurrentUser, getNetworkInterfaces, getOperationalSettings, lookupPostalCode, selectReplayStorageFolder, updateOperationalSettings } from "../lib/api";
+import { applyReplayStorageFolder, getCurrentUser, getLicenseStatus, getNetworkInterfaces, getOperationalSettings, lookupPostalCode, selectReplayStorageFolder, updateOperationalSettings } from "../lib/api";
 
 type FormValues = {
   sessionMinutes: string;
@@ -57,6 +57,11 @@ export function SettingsPage() {
     queryKey: ["operational-settings"],
     queryFn: getOperationalSettings,
     enabled: Boolean(currentUser.data && currentUser.data.role !== "operador"),
+  });
+  const license = useQuery({
+    queryKey: ["license-status"],
+    queryFn: getLicenseStatus,
+    retry: false,
   });
   const networkInterfaces = useQuery({
     queryKey: ["network-interfaces"],
@@ -223,7 +228,7 @@ export function SettingsPage() {
   return <AppShell user={currentUser.data}>
     <main className="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-10">
       <div>
-        <p className="mb-2 flex items-center gap-2 text-sm font-semibold tracking-wide text-emerald-700"><Settings size={17} /> ADMINISTRAÇÃO</p>
+        <p className="mb-2 text-sm font-semibold tracking-wide text-emerald-700">ADMINISTRAÇÃO</p>
         <h1 className="text-3xl font-semibold tracking-tight">Configurações</h1>
         <p className="mt-2 text-slate-500">Defina os padrões operacionais usados pela Arena.</p>
       </div>
@@ -324,7 +329,7 @@ export function SettingsPage() {
         </section>
         </div>
         <div className="mt-6 flex flex-col-reverse items-start justify-between gap-3 sm:flex-row sm:items-center">
-          <p className="text-xs text-slate-500">Última atualização: {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(settings.data.updated_at))}</p>
+          <p className="flex items-center gap-1.5 text-xs text-slate-500">{license.isError || license.data?.check_status === "unavailable" ? <CloudOff className="text-rose-600" size={16} aria-label="API de licença indisponível" /> : license.data?.check_status === "consulted" ? <CloudCheck className="text-emerald-600" size={16} aria-label="API de licença consultada" /> : <CloudAlert className="text-amber-600" size={16} aria-label="API de licença ainda não consultada" />}<span>Última atualização: {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(settings.data.updated_at))}</span></p>
           <Button type="submit" disabled={!valid || !retentionValid || !companyValid || !dirty || save.isPending}>{save.isPending ? "Salvando..." : "Salvar configurações"}</Button>
         </div>
       </form>}

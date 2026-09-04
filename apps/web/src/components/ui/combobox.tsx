@@ -6,6 +6,11 @@ import { type ReactNode, useState } from "react";
 import { cn } from "../../lib/utils";
 import { Button } from "./button";
 
+const normalizeSearchText = (text: string) => text
+  .normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "")
+  .toLocaleLowerCase("pt-BR");
+
 export type ComboboxOption = {
   value: string;
   label: string;
@@ -58,7 +63,10 @@ export function Combobox({
           sideOffset={4}
           className="z-[70] w-[var(--radix-popover-trigger-width)] rounded-xl border bg-popover p-1 text-popover-foreground shadow-lg outline-none data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
         >
-          <CommandPrimitive className="overflow-hidden rounded-lg bg-popover">
+          <CommandPrimitive
+            className="overflow-hidden rounded-lg bg-popover"
+            filter={(optionText, search) => normalizeSearchText(optionText).includes(normalizeSearchText(search)) ? 1 : 0}
+          >
             <div className="flex items-center gap-2 border-b px-3" cmdk-input-wrapper="">
               <Search className="size-4 shrink-0 text-muted-foreground" />
               <CommandPrimitive.Input className="h-10 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground" placeholder={searchPlaceholder} />

@@ -407,7 +407,7 @@ components:
   schemas:
     LicenseStatus:
       type: object
-      required: [allowed, reason, grace_until, support_company, support_whatsapp, support_email]
+      required: [allowed, reason, grace_until, check_status, support_company, support_whatsapp, support_email]
       properties:
         allowed: {type: boolean}
         reason:
@@ -417,6 +417,7 @@ components:
         valid_until: {type: [string, 'null'], format: date}
         grace_until: {type: string, format: date-time}
         next_check_at: {type: [string, 'null'], format: date-time}
+        check_status: {type: string, enum: [consulted, not_consulted, unavailable]}
         support_company: {type: string}
         support_whatsapp: {type: string}
         support_email: {type: string, format: email}
@@ -590,10 +591,11 @@ components:
         used_percent: {type: [number, 'null']}
     CameraHealthItem:
       type: object
-      required: [camera_id, external_id, space_id, space_name, administrative_status, status]
+      required: [camera_id, external_id, description, space_id, space_name, administrative_status, status]
       properties:
         camera_id: {type: string, format: uuid}
         external_id: {type: string}
+        description: {type: string}
         space_id: {type: string, format: uuid}
         space_name: {type: string}
         administrative_status: {type: string, enum: [active, inactive]}

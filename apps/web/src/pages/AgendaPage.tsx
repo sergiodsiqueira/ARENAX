@@ -19,6 +19,8 @@ import { ConfirmationAlertDialog } from "../components/ui/confirmation-alert-dia
 import { Combobox } from "../components/ui/combobox";
 import { Checkbox } from "../components/ui/checkbox";
 import { Input } from "../components/ui/input";
+import { ModalCloseButton } from "../components/ui/modal-close-button";
+import { useModalEscape } from "../hooks/use-modal-escape";
 import { SessionSchedulePicker } from "../components/ui/session-schedule-picker";
 import { Textarea } from "../components/ui/textarea";
 import {
@@ -120,6 +122,8 @@ export function AgendaPage() {
   const [spaceFilter, setSpaceFilter] = useState("all");
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [clientDraft, setClientDraft] = useState({ name: "", phone: "", email: "", notes: "" });
+  useModalEscape(creating && !editingClient, () => setCreating(false));
+  useModalEscape(Boolean(editingClient), () => setEditingClient(null));
   const window = useMemo(() => dayWindow(day), [day]);
   const user = useQuery({
     queryKey: ["current-user"],
@@ -416,25 +420,21 @@ export function AgendaPage() {
                     A Sessão nasce Agendada e deve utilizar ao menos um Espaço.
                   </p>
                 </div>
-                <button
-                  className="text-sm font-semibold text-slate-500"
-                  type="button"
-                  onClick={() => setCreating(false)}
-                >
-                  Fechar
-                </button>
+                <ModalCloseButton onClick={() => setCreating(false)} />
               </div>
               <label className="mt-6 block text-sm font-semibold text-slate-600">
                 Cliente Responsável
                 <Combobox
                   value={responsibleId}
                   onValueChange={setResponsibleId}
-                  options={(clients.data ?? []).map((client) => ({
-                    value: client.id,
-                    label: client.name,
-                    detail: client.phone ? formatPhone(client.phone) : "Não informado",
-                    detailIcon: <Phone className="size-3.5" />,
-                  }))}
+                  options={(clients.data ?? [])
+                    .filter((client) => client.administrative_status === "active")
+                    .map((client) => ({
+                      value: client.id,
+                      label: client.name,
+                      detail: client.phone ? formatPhone(client.phone) : "Não informado",
+                      detailIcon: <Phone className="size-3.5" />,
+                    }))}
                   placeholder="Selecione o Cliente"
                   searchPlaceholder="Buscar Cliente..."
                   onOptionEdit={openClientEdit}
@@ -510,13 +510,7 @@ export function AgendaPage() {
                     Atualize os dados de contato sem sair do agendamento.
                   </p>
                 </div>
-                <button
-                  className="text-sm font-semibold text-slate-500"
-                  type="button"
-                  onClick={() => setEditingClient(null)}
-                >
-                  Fechar
-                </button>
+                <ModalCloseButton onClick={() => setEditingClient(null)} />
               </div>
               <div className="mt-6 grid gap-4">
                 <label className="text-sm font-semibold text-slate-600">

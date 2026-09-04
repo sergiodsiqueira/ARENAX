@@ -1,4 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { faWhatsapp } from "@fortawesome/free-brands-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   ArrowLeft,
   CalendarClock,
@@ -26,6 +28,8 @@ import { toast } from "sonner";
 import { AppShell } from "../components/AppShell";
 import { Combobox } from "../components/ui/combobox";
 import { Input } from "../components/ui/input";
+import { ModalCloseButton } from "../components/ui/modal-close-button";
+import { useModalEscape } from "../hooks/use-modal-escape";
 import {
   changeExpectedAmount,
   getClients,
@@ -74,6 +78,9 @@ const dateTime = (value: string | null) =>
         timeStyle: "short",
       }).format(new Date(value))
     : "—";
+const formatPhone = (value: string) => value.replace(/\D/g, "").slice(0, 11)
+  .replace(/^(\d{2})(\d)/, "($1) $2")
+  .replace(/(\d{4,5})(\d{4})$/, "$1-$2");
 const currency = (cents: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
     cents / 100,
@@ -99,6 +106,7 @@ export function SessionDossierPage() {
   const [method, setMethod] = useState<PaymentMethod>("pix");
   const [note, setNote] = useState("");
   const [priceModalOpen, setPriceModalOpen] = useState(false);
+  useModalEscape(priceModalOpen, () => setPriceModalOpen(false));
   const [expectedAmountInput, setExpectedAmountInput] = useState("");
   const user = useQuery({
     queryKey: ["current-user"],
@@ -123,9 +131,8 @@ export function SessionDossierPage() {
   useEffect(() => {
     if (user.isError) navigate("/login", { replace: true });
   }, [navigate, user.isError]);
-  const clientNames = useMemo(
-    () =>
-      new Map((clients.data ?? []).map((client) => [client.id, client.name])),
+  const clientsById = useMemo(
+    () => new Map((clients.data ?? []).map((client) => [client.id, client])),
     [clients.data],
   );
   const spaceNames = useMemo(
@@ -267,6 +274,7 @@ export function SessionDossierPage() {
       </AppShell>
     );
   const session = dossier.data;
+  const responsibleClient = clientsById.get(session.responsible_client_id);
   const sessionPayments = session.payments ?? [];
   return (
     <AppShell user={user.data}>
@@ -294,10 +302,8 @@ export function SessionDossierPage() {
           <Info
             icon={<UserRound size={19} />}
             label="Responsável"
-            value={
-              clientNames.get(session.responsible_client_id) ??
-              "Cliente desconhecido"
-            }
+            value={responsibleClient?.name ?? "Cliente desconhecido"}
+            detail={<span className="inline-flex items-center gap-2">{responsibleClient?.phone ? formatPhone(responsibleClient.phone) : "Telefone não informado"}{responsibleClient?.whatsapp && responsibleClient.phone ? <FontAwesomeIcon className="text-base text-emerald-700" icon={faWhatsapp} title="WhatsApp" aria-label="WhatsApp" /> : null}</span>}
           />
           <Info
             icon={<MapPin size={19} />}
@@ -319,8 +325,8 @@ export function SessionDossierPage() {
         </section>
         <section className="mt-7 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-            <div className="flex items-center gap-2">
-              <DollarSign className="text-emerald-700" size={21} />
+            <div className="flex items-start gap-2">
+              <DollarSign className="mt-0.5 shrink-0 text-emerald-700" size={21} />
               <div>
                 <h2 className="text-xl font-semibold">Pagamentos</h2>
                 <div className="mt-1 flex flex-wrap items-center">
@@ -473,7 +479,7 @@ export function SessionDossierPage() {
                 expectedAmount.mutate();
               }}
             >
-              <h2 className="text-xl font-semibold">Alterar valor previsto</h2>
+              <div className="flex items-start justify-between gap-4"><h2 className="text-xl font-semibold">Alterar valor previsto</h2><ModalCloseButton onClick={() => setPriceModalOpen(false)} /></div>
               <p className="mt-2 text-sm text-slate-500">
                 Este valor substituirá o cálculo automático desta Sessão até que
                 ele seja recalculado.
@@ -623,10 +629,12 @@ function Info({
   icon,
   label,
   value,
+  detail,
 }: {
   icon: ReactNode;
   label: string;
   value: string;
+  detail?: ReactNode;
 }) {
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -639,6 +647,7 @@ function Info({
       <p className="mt-3 text-sm font-semibold leading-relaxed text-slate-800">
         {value}
       </p>
+      {detail && <p className="mt-1 text-xs text-slate-500">{detail}</p>}
     </article>
   );
 }

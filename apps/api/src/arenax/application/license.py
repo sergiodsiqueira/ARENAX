@@ -24,7 +24,8 @@ class LicenseService:
                 result = await self._gateway.check(tax_id)
             except LicenseCheckUnavailable as exc:
                 state = await self._repository.record_failure(
-                    str(exc), now + timedelta(minutes=5)
+                    str(exc) or "Serviço de licenças indisponível",
+                    now + timedelta(minutes=5),
                 )
             else:
                 state = await self._repository.record_result(tax_id, result, now)

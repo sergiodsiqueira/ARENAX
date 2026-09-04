@@ -13,6 +13,8 @@ import { AgendaPage } from "./pages/AgendaPage";
 import { SessionDossierPage } from "./pages/SessionDossierPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { HealthCenterPage } from "./pages/HealthCenterPage";
+import { FinancialDashboardPage } from "./pages/FinancialDashboardPage";
+import { PendingPaymentsPage } from "./pages/PendingPaymentsPage";
 import { Toaster } from "./components/ui/sonner";
 import { LicenseGuard } from "./components/LicenseGuard";
 import "./styles.css";
@@ -33,6 +35,8 @@ createRoot(document.getElementById("root")!).render(
           <Route path="/administracao/equipamentos" element={<EquipmentsAdministrationPage />} />
           <Route path="/administracao/configuracoes" element={<SettingsPage />} />
           <Route path="/health-center" element={<HealthCenterPage />} />
+          <Route path="/administracao/financeiro" element={<FinancialDashboardPage />} />
+          <Route path="/administracao/financeiro/pendencias" element={<PendingPaymentsPage />} />
           <Route path="/administracao/health-center" element={<Navigate to="/health-center" replace />} />
           <Route path="/cadastros/clientes" element={<ClientsAdministrationPage />} />
           <Route path="/cadastros/espacos" element={<SpacesAdministrationPage />} />

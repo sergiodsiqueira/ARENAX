@@ -11,6 +11,8 @@ import { ConfirmationAlertDialog } from "../components/ui/confirmation-alert-dia
 import { Combobox } from "../components/ui/combobox";
 import { Checkbox } from "../components/ui/checkbox";
 import { Input } from "../components/ui/input";
+import { ModalCloseButton } from "../components/ui/modal-close-button";
+import { useModalEscape } from "../hooks/use-modal-escape";
 import { SearchInput } from "../components/ui/search-input";
 import { Textarea } from "../components/ui/textarea";
 import {
@@ -65,6 +67,7 @@ export function ClientsAdministrationPage() {
     [email, setEmail] = useState(""),
     [whatsapp, setWhatsapp] = useState(false),
     [status, setStatus] = useState<Client["administrative_status"]>("active");
+  useModalEscape(Boolean(modal), () => setModal(null));
   const user = useQuery({
       queryKey: ["current-user"],
       queryFn: getCurrentUser,
@@ -267,9 +270,7 @@ export function ClientsAdministrationPage() {
                 save.mutate();
               }}
             >
-              <h2 className="text-xl font-semibold">
-                {modal === "new" ? "Cadastrar Cliente" : "Editar Cliente"}
-              </h2>
+              <div className="flex items-start justify-between gap-4"><h2 className="text-xl font-semibold">{modal === "new" ? "Cadastrar Cliente" : "Editar Cliente"}</h2><ModalCloseButton onClick={() => setModal(null)} /></div>
               <div className="mt-5 grid gap-4 sm:grid-cols-[140px_minmax(0,1fr)_auto] sm:items-end">
                 <label className="block text-sm font-semibold">
                   Tipo
