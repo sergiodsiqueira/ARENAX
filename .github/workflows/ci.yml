@@ -66,7 +66,7 @@ jobs:
           ARENAX_DATA_PATH: ./data
           ARENAX_MEDIA_PATH: ./media
         run: docker compose -f docker-compose.production.yml config --quiet
-      - uses: aquasecurity/trivy-action@0.28.0
+      - uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
