@@ -1,6 +1,8 @@
 services:
   postgres:
     image: postgres:16-alpine
+    ports:
+      - "127.0.0.1:5432:5432"
     environment:
       POSTGRES_DB: arenax
       POSTGRES_USER: arenax
@@ -24,8 +26,54 @@ services:
     build: ./apps/api
     environment:
       ARENAX_DATABASE_URL: postgresql+asyncpg://arenax:arenax@postgres:5432/arenax
+      ARENAX_MEDIAMTX_API_URL: http://mediamtx:9997
+      ARENAX_MEDIAMTX_PUBLIC_WEBRTC_URL: ${ARENAX_MEDIAMTX_PUBLIC_WEBRTC_URL:-http://localhost:8889}
+      ARENAX_LIVE_PATH_SECRET: ${ARENAX_LIVE_PATH_SECRET:-arenax-local-development}
+      ARENAX_MEDIA_HOST_PATH: ${ARENAX_MEDIA_HOST_PATH:-./media}
+      ARENAX_HOST_AGENT_URL: http://host.docker.internal:8765
+      ARENAX_HOST_AGENT_SECRET: ${ARENAX_HOST_AGENT_SECRET:-}
     ports:
       - "8000:8000"
+    volumes:
+      - ${ARENAX_MEDIA_HOST_PATH:-./media}:/media:ro
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen('http://localhost:8000/api/v1/health', timeout=2)
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      mediamtx:
+        condition: service_started
+
+  mediamtx:
+    image: bluenviron/mediamtx:1.20.0
+    environment:
+      MTX_WEBRTCADDITIONALHOSTS: ${ARENAX_WEBRTC_HOST:-127.0.0.1}
+    ports:
+      - "8889:8889"
+      - "8189:8189/udp"
+    volumes:
+      - ./docker/mediamtx.yml:/mediamtx.yml:ro
+    restart: unless-stopped
+
+  capture-service:
+    build: ./services/capture-service
+    environment:
+      DATABASE_URL: postgresql://arenax:arenax@postgres:5432/arenax
+      MEDIA_ROOT: /media
+      CAPTURE_SEGMENT_SECONDS: 2
+      CAPTURE_RETENTION_SECONDS: 120
+    volumes:
+      - ${ARENAX_MEDIA_HOST_PATH:-./media}:/media
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -35,12 +83,14 @@ services:
     environment:
       DATABASE_URL: postgresql://arenax:arenax@postgres:5432/arenax
       MEDIA_ROOT: /media
+      CAPTURE_SEGMENT_SECONDS: 2
     volumes:
-      - ./media:/media
+      - ${ARENAX_MEDIA_HOST_PATH:-./media}:/media
     depends_on:
       migrate:
         condition: service_completed_successfully
+      capture-service:
+        condition: service_started
 
 volumes:
   postgres-data:
-

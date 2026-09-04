@@ -5,8 +5,8 @@
 | Arena | Estabelecimento físico operado pela ARENAX. |
 | Espaço | Área/recurso físico reservável ou utilizável em uma Sessão. |
 | Sessão | Utilização de um ou mais Espaços durante um período; entidade central. |
-| Pessoa | Cadastro de pessoa relacionada à operação. |
-| Responsável | Pessoa principal responsável pela Sessão. |
+| Cliente | Cadastro de pessoa atendida pela Arena. |
+| Responsável | Papel exercido pelo Cliente principal da Sessão. |
 | Equipamento | Dispositivo físico instalado na Arena. |
 | Câmera | Equipamento que fornece stream de vídeo, normalmente RTSP. |
 | AX Device | ESP32 + botão que publica um evento físico. |

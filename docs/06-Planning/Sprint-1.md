@@ -3,7 +3,7 @@
 ## Objetivo
 Validar o diferencial técnico ponta a ponta.
 
-1. Cadastrar Pessoa.
+1. Cadastrar Cliente.
 2. Cadastrar Espaço.
 3. Configurar Câmera e AX Device.
 4. Criar/Iniciar Sessão.

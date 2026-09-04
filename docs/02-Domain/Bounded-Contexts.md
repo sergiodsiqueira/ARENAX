@@ -12,7 +12,12 @@ Solicitação de Momento, captura de buffer, FFmpeg, Replay, biblioteca e compar
 ## Financeiro
 No MVP, pagamentos manuais associados à Sessão.
 
-## Pessoas
-Cadastro e consulta de Pessoas/Responsáveis.
+## Clientes
+Cadastro e consulta de Clientes/Responsáveis.
+
+## Configurações
+Administra os valores operacionais globais da Arena. Cada valor continua sendo
+interpretado pelo contexto proprietário da regra: duração padrão pela Operação e
+janela de vídeo por Momentos / Replay.
 
 > Bounded Context não implica microsserviço. O MVP será um **monólito modular**.

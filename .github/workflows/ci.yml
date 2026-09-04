@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        component:
+          - path: apps/api
+            install: pip install -e ".[dev]"
+          - path: services/capture-service
+            install: pip install -r requirements.txt
+          - path: services/replay-worker
+            install: pip install -r requirements.txt
+    defaults:
+      run:
+        working-directory: ${{ matrix.component.path }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: ${{ matrix.component.install }}
+      - run: pytest
+      - if: matrix.component.path == 'apps/api'
+        run: ruff check src tests --select E9,F63,F7,F82
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+
+  containers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cp .env.example .env
+      - run: docker compose build
+      - run: docker build -t arenax-web:ci apps/web
+      - name: Validate production Compose
+        env:
+          ARENAX_VERSION: ci
+          ARENAX_POSTGRES_PASSWORD: ci-only-password
+          ARENAX_LIVE_PATH_SECRET: ci-only-secret
+          ARENAX_HOST_AGENT_SECRET: ci-only-secret
+          ARENAX_DATA_PATH: ./data
+          ARENAX_MEDIA_PATH: ./media
+        run: docker compose -f docker-compose.production.yml config --quiet
+      - uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-results.sarif
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+      - uses: actions/upload-artifact@v4
+        if: always() && hashFiles('trivy-results.sarif') != ''
+        with:
+          name: trivy-sarif
+          path: trivy-results.sarif
+          retention-days: 30

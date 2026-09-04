@@ -19,17 +19,31 @@ Core rule:
 
 Pré-requisito: Docker com Compose.
 
+O diretório de mídia é definido durante a instalação. Instale uma vez o Agente
+Local, em um PowerShell aberto como Administrador:
+
+```powershell
+.\services\local-agent\install.ps1
+```
+
+Depois disso, Proprietários e Administradores alteram a pasta pela tela de
+Configurações, usando o seletor nativo do Windows e sem executar comandos.
+
 ```powershell
 docker compose up --build
 ```
 
 A API fica em `http://localhost:8000`, com OpenAPI interativo em `/docs`. O fluxo
-inicial permite cadastrar Pessoa, Espaço, Câmera/AX Device, criar e iniciar uma
+inicial permite cadastrar Cliente, Espaço, Câmera/AX Device, criar e iniciar uma
 Sessão e publicar `POST /api/v1/events/button-pressed` com `Idempotency-Key`.
 
-Para uma Câmera do adapter de desenvolvimento, informe
-`configuration.source_path` apontando para um arquivo visível em `/media`. Replays
-são gravados em `media/replays/`.
+Para uma Câmera, informe `configuration.capture_url` com a URL RTSP de produção
+ou um arquivo visível em `/media`. O
+Capture Service mantém segmentos em `media/buffers/`, aplica retenção e publica
+saúde em `media/capture-health/`. Replays são gravados em `media/replays/`.
+Para exibição ao vivo, a API registra sob demanda a mesma fonte RTSP no MediaMTX e
+entrega ao navegador somente o canal WebRTC interno. Credenciais RTSP não são
+expostas ao frontend. O player fica em `http://localhost:8889` no ambiente local.
 
 Testes do backend:
 
@@ -37,8 +51,42 @@ Testes do backend:
 docker compose run --rm api pytest
 ```
 
+Validação ponta a ponta da vertical slice (inclui testes, Sessão, AX Event,
+idempotência, Momento, Timeline e geração de Replay):
+
+```powershell
+.\scripts\smoke-test.ps1
+```
+
+O smoke test cria dados identificados por `Smoke Test` no banco local e remove os
+arquivos de vídeo sintéticos ao terminar.
+
 O contrato versionado está em `docs/03-Architecture/openapi.yaml` e as decisões
 temporais/de entrega estão nos ADRs 011 e 012.
+
+## CI/CD e distribuição Windows
+
+Pull requests e commits em `main` executam testes, lint, builds, validação do
+Compose e varredura de vulnerabilidades. Uma tag SemVer (`vX.Y.Z`) publica quatro
+imagens versionadas no GHCR e gera `ArenaX-Setup-<versão>.exe`, seu SHA-256 e uma
+GitHub Release. O ambiente instalado usa `docker-compose.production.yml`; banco,
+configuração e Replays ficam fora da pasta do aplicativo e são preservados por
+padrão. Consulte `docs/06-Planning/CI-CD-Distribution-Plan.md`.
+
+## Primeiro acesso
+
+Após executar as migrations, crie o primeiro proprietário sem registrar a senha
+no histórico do terminal:
+
+```powershell
+docker compose run --rm api python -m arenax.cli.create_user `
+  --nome "Proprietário" `
+  --email "proprietario@arena.com.br" --papel proprietario
+```
+
+O login web fica em `http://localhost:5173/login` e usa cookie HttpOnly.
+O Mission Control recebe sinais operacionais em tempo real por SSE autenticado e
+mantém polling automático como contingência durante desconexões.
 
 ## Initial Structure
 

@@ -1,6 +1,6 @@
 # Missão
 
-Simplificar a operação de arenas esportivas, centralizando pessoas, espaços, sessões e momentos em uma única plataforma intuitiva.
+Simplificar a operação de arenas esportivas, centralizando clientes, espaços, sessões e momentos em uma única plataforma intuitiva.
 
 ## Valores
 - Simplicidade acima da complexidade.

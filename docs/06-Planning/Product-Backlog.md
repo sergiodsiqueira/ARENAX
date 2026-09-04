@@ -7,7 +7,7 @@
 | P0 | PostgreSQL/migrações | Persistência versionada. |
 | P0 | Sessão | Criar/consultar/iniciar/prorrogar/finalizar/cancelar. |
 | P0 | Conflitos | Impedir sobreposição de Espaços. |
-| P1 | Pessoas | Cadastro e Responsável. |
+| P1 | Clientes | Cadastro e Responsável. |
 | P1 | Espaços | CRUD incluindo DELETE controlado. |
 | P1 | Equipamentos | Câmeras/AX Devices incluindo DELETE controlado. |
 | P1 | Agenda | Sessões por data/Espaço. |
@@ -16,11 +16,19 @@
 | P1 | Capture Service | Buffer contínuo. |
 | P1 | Replay Worker | Vídeo retroativo/posterior. |
 | P1 | Momento | Associar Replay à Sessão. |
-| P2 | Compartilhamento | WhatsApp/e-mail. |
-| P2 | Pagamento | Registro manual. |
+| P2 | Pagamento | Registro manual imutável por Sessão. **Implementado.** |
 | P2 | Health Center | Saúde de infraestrutura. |
-| P2 | Arena Designer | Editor visual. |
+| P2 | Configurações | Padrões de Sessão/Replay, retenção sem remoção automática por padrão e diretório local de mídia. |
+| P2 | Compartilhamento | Download e compartilhamento local autenticado, com fallback para WhatsApp sem anexo automático. |
+| P1 | Distribuição e CI/CD | Imagens versionadas no GHCR e instalador Windows publicado automaticamente em GitHub Releases. **Planejado para iniciar em 2026-09-04.** |
 | P3 | Dashboard TV | Visão ampliada. |
+| Pós-v1 | Arena Designer | Editor visual removido da v1. |
 
 ## Priorização
 Perguntar: a qual contexto pertence? relaciona-se a Sessão? melhora operação? é necessária ao MVP?
+
+## Decisão de sequenciamento
+O Compartilhamento de Replays fica como a última entrega do MVP. A v1 será instalada
+na máquina local da Arena, funcionará somente na rede local e não oferecerá link
+público. Os arquivos permanecerão em armazenamento local configurável. Validade,
+experiência de entrega e granularidade da auditoria ainda precisam ser fechadas.

@@ -19,6 +19,9 @@ Start with:
 - `docs/03-Architecture/Architecture.md`
 - `docs/06-Planning/Product-Backlog.md`
 
+For frontend or visual work, also read `docs/04-UX/Design-System.md`. Its
+Stravix-inspired palette and layout direction are the official visual reference.
+
 ## Architecture
 
 The project follows:

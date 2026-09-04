@@ -5,7 +5,7 @@
 /api/v1/arenas
 /api/v1/spaces
 /api/v1/sessions
-/api/v1/people
+/api/v1/clients
 /api/v1/equipments
 /api/v1/moments
 /api/v1/replays
