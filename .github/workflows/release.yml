@@ -1,0 +1,107 @@
+name: Release
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+        working-directory: apps/web
+      - run: npm run lint && npm run build
+        working-directory: apps/web
+      - run: docker compose build
+      - run: docker compose run --rm api pytest
+      - run: docker compose run --rm capture-service pytest
+      - run: docker compose run --rm replay-worker pytest
+
+  images:
+    needs: quality
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - image: arenax-api
+            context: apps/api
+          - image: arenax-web
+            context: apps/web
+          - image: arenax-capture-service
+            context: services/capture-service
+          - image: arenax-replay-worker
+            context: services/replay-worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${{ github.ref_name }}
+            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:sha-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ github.ref_name }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  installer:
+    needs: images
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build installer
+        shell: powershell
+        run: |
+          $version = "${{ github.ref_name }}"
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$version" "installer\arenax.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup falhou." }
+      - name: Sign installer when certificate is configured
+        shell: powershell
+        env:
+          SIGNING_CERTIFICATE: ${{ secrets.ARENAX_SIGNING_CERTIFICATE_BASE64 }}
+          SIGNING_PASSWORD: ${{ secrets.ARENAX_SIGNING_CERTIFICATE_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:SIGNING_CERTIFICATE)) {
+            Write-Output "Certificado não configurado; instalador de homologação ficará sem assinatura."
+            exit 0
+          }
+          $certificate = Join-Path $env:RUNNER_TEMP "arenax-signing.pfx"
+          [IO.File]::WriteAllBytes($certificate, [Convert]::FromBase64String($env:SIGNING_CERTIFICATE))
+          $signTool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Filter signtool.exe -Recurse |
+            Where-Object FullName -Match '\\x64\\' | Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $signTool) { throw "signtool.exe não encontrado." }
+          & $signTool.FullName sign /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com /f $certificate /p $env:SIGNING_PASSWORD "installer\output\ArenaX-Setup-${{ github.ref_name }}.exe"
+          Remove-Item -LiteralPath $certificate -Force
+          if ($LASTEXITCODE -ne 0) { throw "Assinatura do instalador falhou." }
+      - name: Generate checksum
+        shell: powershell
+        run: |
+          $version = "${{ github.ref_name }}"
+          $setup = "installer\output\ArenaX-Setup-$version.exe"
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $setup).Hash.ToLowerInvariant()
+          "$hash  ArenaX-Setup-$version.exe" | Set-Content -Encoding ascii -LiteralPath "$setup.sha256"
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            installer/output/ArenaX-Setup-${{ github.ref_name }}.exe
+            installer/output/ArenaX-Setup-${{ github.ref_name }}.exe.sha256

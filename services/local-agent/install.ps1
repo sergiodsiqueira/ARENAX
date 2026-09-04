@@ -41,6 +41,11 @@ $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) 
 Register-ScheduledTask -TaskName "ARENAX Local Agent" -Action $action -Trigger $trigger -Settings $settings -Force | Out-Null
 Start-ScheduledTask -TaskName "ARENAX Local Agent"
 
-docker compose --project-directory $workspace up -d --force-recreate api
+$composeFile = if (Test-Path -LiteralPath (Join-Path $workspace "docker-compose.production.yml")) {
+    Join-Path $workspace "docker-compose.production.yml"
+} else {
+    Join-Path $workspace "docker-compose.yml"
+}
+docker compose --project-directory $workspace -f $composeFile up -d --force-recreate api
 if ($LASTEXITCODE -ne 0) { throw "O agente foi instalado, mas a API não pôde ser atualizada." }
 Write-Output "Agente Local da ARENAX instalado e iniciado."

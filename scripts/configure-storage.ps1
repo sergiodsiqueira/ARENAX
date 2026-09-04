@@ -5,6 +5,11 @@ param(
 
 $ErrorActionPreference = "Stop"
 $workspace = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
+$composeFile = if (Test-Path -LiteralPath (Join-Path $workspace "docker-compose.production.yml")) {
+    Join-Path $workspace "docker-compose.production.yml"
+} else {
+    Join-Path $workspace "docker-compose.yml"
+}
 $target = [System.IO.Path]::GetFullPath($Path)
 $targetRoot = [System.IO.Path]::GetPathRoot($target)
 
@@ -55,21 +60,21 @@ $previousEnvironment = if (Test-Path -LiteralPath $environmentFile) {
 } else {
     $null
 }
-docker compose --project-directory $workspace stop capture-service replay-worker
+docker compose --project-directory $workspace -f $composeFile stop capture-service replay-worker
 if ($LASTEXITCODE -ne 0) { throw "Não foi possível pausar os processos de vídeo." }
 if ((Test-Path -LiteralPath $currentMedia) -and ((Resolve-Path $currentMedia).Path -ne $target)) {
     Get-ChildItem -LiteralPath $currentMedia -Force | Copy-Item -Destination $target -Recurse -Force
 }
 
 [System.IO.File]::WriteAllLines($environmentFile, $updated, [System.Text.UTF8Encoding]::new($false))
-docker compose --project-directory $workspace up -d --force-recreate api capture-service replay-worker
+docker compose --project-directory $workspace -f $composeFile up -d --force-recreate api capture-service replay-worker
 if ($LASTEXITCODE -ne 0) {
     if ($null -eq $previousEnvironment) {
         Remove-Item -LiteralPath $environmentFile -ErrorAction SilentlyContinue
     } else {
         [System.IO.File]::WriteAllText($environmentFile, $previousEnvironment, [System.Text.UTF8Encoding]::new($false))
     }
-    docker compose --project-directory $workspace up -d --force-recreate api capture-service replay-worker
+    docker compose --project-directory $workspace -f $composeFile up -d --force-recreate api capture-service replay-worker
     throw "Não foi possível usar o novo armazenamento. A configuração anterior foi restaurada."
 }
 

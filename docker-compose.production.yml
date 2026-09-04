@@ -1,0 +1,105 @@
+name: arenax
+
+x-api-image: &api-image ${ARENAX_IMAGE_REGISTRY:-ghcr.io/sergiodsiqueira}/arenax-api:${ARENAX_VERSION:?ARENAX_VERSION deve ser definida}
+x-common-environment: &common-environment
+  DATABASE_URL: postgresql://arenax:${ARENAX_POSTGRES_PASSWORD:?ARENAX_POSTGRES_PASSWORD deve ser definida}@postgres:5432/arenax
+  MEDIA_ROOT: /media
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: arenax
+      POSTGRES_USER: arenax
+      POSTGRES_PASSWORD: ${ARENAX_POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U arenax -d arenax"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - ${ARENAX_DATA_PATH:?ARENAX_DATA_PATH deve ser definida}/postgres:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  migrate:
+    image: *api-image
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      ARENAX_DATABASE_URL: postgresql+asyncpg://arenax:${ARENAX_POSTGRES_PASSWORD}@postgres:5432/arenax
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    image: *api-image
+    environment:
+      ARENAX_DATABASE_URL: postgresql+asyncpg://arenax:${ARENAX_POSTGRES_PASSWORD}@postgres:5432/arenax
+      ARENAX_MEDIAMTX_API_URL: http://mediamtx:9997
+      ARENAX_MEDIAMTX_PUBLIC_WEBRTC_URL: http://${ARENAX_PUBLIC_HOST:-localhost}:8889
+      ARENAX_LIVE_PATH_SECRET: ${ARENAX_LIVE_PATH_SECRET:?ARENAX_LIVE_PATH_SECRET deve ser definida}
+      ARENAX_MEDIA_HOST_PATH: ${ARENAX_MEDIA_PATH:?ARENAX_MEDIA_PATH deve ser definida}
+      ARENAX_HOST_AGENT_URL: http://host.docker.internal:8765
+      ARENAX_HOST_AGENT_SECRET: ${ARENAX_HOST_AGENT_SECRET:?ARENAX_HOST_AGENT_SECRET deve ser definida}
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ${ARENAX_MEDIA_PATH}:/media:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      mediamtx:
+        condition: service_started
+    restart: unless-stopped
+
+  web:
+    image: ${ARENAX_IMAGE_REGISTRY:-ghcr.io/sergiodsiqueira}/arenax-web:${ARENAX_VERSION}
+    ports:
+      - "${ARENAX_HTTP_PORT:-80}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  mediamtx:
+    image: bluenviron/mediamtx:1.20.0
+    environment:
+      MTX_WEBRTCADDITIONALHOSTS: ${ARENAX_PUBLIC_HOST:-127.0.0.1}
+    ports:
+      - "8889:8889"
+      - "8189:8189/udp"
+    volumes:
+      - ./docker/mediamtx.yml:/mediamtx.yml:ro
+    restart: unless-stopped
+
+  capture-service:
+    image: ${ARENAX_IMAGE_REGISTRY:-ghcr.io/sergiodsiqueira}/arenax-capture-service:${ARENAX_VERSION}
+    environment:
+      <<: *common-environment
+      CAPTURE_SEGMENT_SECONDS: 2
+      CAPTURE_RETENTION_SECONDS: 120
+    volumes:
+      - ${ARENAX_MEDIA_PATH}:/media
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  replay-worker:
+    image: ${ARENAX_IMAGE_REGISTRY:-ghcr.io/sergiodsiqueira}/arenax-replay-worker:${ARENAX_VERSION}
+    environment:
+      <<: *common-environment
+      CAPTURE_SEGMENT_SECONDS: 2
+    volumes:
+      - ${ARENAX_MEDIA_PATH}:/media
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      capture-service:
+        condition: service_started
+    restart: unless-stopped

@@ -64,6 +64,15 @@ arquivos de vídeo sintéticos ao terminar.
 O contrato versionado está em `docs/03-Architecture/openapi.yaml` e as decisões
 temporais/de entrega estão nos ADRs 011 e 012.
 
+## CI/CD e distribuição Windows
+
+Pull requests e commits em `main` executam testes, lint, builds, validação do
+Compose e varredura de vulnerabilidades. Uma tag SemVer (`vX.Y.Z`) publica quatro
+imagens versionadas no GHCR e gera `ArenaX-Setup-<versão>.exe`, seu SHA-256 e uma
+GitHub Release. O ambiente instalado usa `docker-compose.production.yml`; banco,
+configuração e Replays ficam fora da pasta do aplicativo e são preservados por
+padrão. Consulte `docs/06-Planning/CI-CD-Distribution-Plan.md`.
+
 ## Primeiro acesso
 
 Após executar as migrations, crie o primeiro proprietário sem registrar a senha
