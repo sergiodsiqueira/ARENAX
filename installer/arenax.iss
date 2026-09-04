@@ -33,7 +33,7 @@ Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Fil
 Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\services\local-agent\install.ps1"""; StatusMsg: "Instalando Agente Local..."; Flags: runhidden waituntilterminated
 
 [Icons]
-Name: "{group}\ARENAX"; Filename: "http://localhost"; Flags: shellexec
+Name: "{group}\ARENAX"; Filename: "http://localhost"
 Name: "{group}\Criar primeiro Proprietário"; Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\scripts\distribution\create-owner.ps1"""
 
 [UninstallRun]
