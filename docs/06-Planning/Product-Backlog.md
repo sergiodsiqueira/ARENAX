@@ -20,6 +20,7 @@
 | P2 | Health Center | Saúde de infraestrutura. |
 | P2 | Configurações | Padrões de Sessão/Replay, retenção sem remoção automática por padrão e diretório local de mídia. |
 | P2 | Compartilhamento | Download e compartilhamento local autenticado, com fallback para WhatsApp sem anexo automático. |
+| P1 | Distribuição e CI/CD | Imagens versionadas no GHCR e instalador Windows publicado automaticamente em GitHub Releases. **Planejado para iniciar em 2026-09-04.** |
 | P3 | Dashboard TV | Visão ampliada. |
 | Pós-v1 | Arena Designer | Editor visual removido da v1. |
 
