@@ -226,53 +226,53 @@ export function SettingsPage() {
   };
 
   return <AppShell user={currentUser.data}>
-    <main className="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-10">
+    <main className="page-shell">
       <div>
-        <p className="mb-2 text-sm font-semibold tracking-wide text-emerald-700">ADMINISTRAÇÃO</p>
-        <h1 className="text-3xl font-semibold tracking-tight">Configurações</h1>
-        <p className="mt-2 text-slate-500">Defina os padrões operacionais usados pela Arena.</p>
+        <p className="mb-2 text-sm font-semibold tracking-wide text-primary">ADMINISTRAÇÃO</p>
+        <h1 className="page-heading">Configurações</h1>
+        <p className="mt-2 text-muted-foreground">Defina os padrões operacionais usados pela Arena.</p>
       </div>
-      {settings.isLoading && <div className="mt-8 h-72 animate-pulse rounded-2xl border border-slate-200 bg-white" />}
-      {settings.isError && <div className="mt-8 rounded-2xl border border-rose-200 bg-white p-6 text-rose-800">Não foi possível carregar as Configurações.</div>}
+      {settings.isLoading && <div className="mt-8 h-72 animate-pulse rounded-2xl border border-border bg-card" />}
+      {settings.isError && <div className="mt-8 rounded-2xl border border-danger-border bg-card p-6 text-destructive">Não foi possível carregar as Configurações.</div>}
       {settings.data && <form className="mt-8" onSubmit={submit}>
         <div className="grid gap-5 md:grid-cols-2">
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:col-span-2">
-          <span className="inline-flex rounded-xl bg-emerald-50 p-2.5 text-emerald-700"><Clock3 size={21} /></span>
+        <section className="rounded-2xl border border-border bg-card p-6 shadow-sm md:col-span-2">
+          <span className="inline-flex rounded-xl bg-secondary p-2.5 text-primary"><Clock3 size={21} /></span>
           <h2 className="mt-4 text-lg font-semibold">Sessões</h2>
-          <p className="mt-2 text-sm text-slate-500">Duração padrão usada ao criar uma nova Sessão.</p>
-          <label className="mt-6 block text-sm font-semibold text-slate-600">
+          <p className="mt-2 text-sm text-muted-foreground">Duração padrão usada ao criar uma nova Sessão.</p>
+          <label className="mt-6 block text-sm font-semibold text-foreground">
             Duração padrão de cada Sessão
-            <div className="relative mt-2 max-w-xs"><Input className="pr-20" type="number" min="1" step="1" value={displayedForm.sessionMinutes} onChange={(event) => setForm({ ...displayedForm, sessionMinutes: event.target.value })} aria-describedby="session-duration-help" required /><span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-slate-400">minutos</span></div>
+            <div className="relative mt-2 max-w-xs"><Input className="pr-20" type="number" min="1" step="1" value={displayedForm.sessionMinutes} onChange={(event) => setForm({ ...displayedForm, sessionMinutes: event.target.value })} aria-describedby="session-duration-help" required /><span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-muted-foreground">minutos</span></div>
           </label>
-          <p id="session-duration-help" className="mt-2 text-xs text-slate-500">Preenche o horário final; o operador poderá ajustá-lo antes de salvar.</p>
-          <label className="mt-6 flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+          <p id="session-duration-help" className="mt-2 text-xs text-muted-foreground">Preenche o horário final; o operador poderá ajustá-lo antes de salvar.</p>
+          <label className="mt-6 flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted p-4 text-sm">
             <Checkbox checked={displayedForm.calculateActualTime} onCheckedChange={(checked) => setForm({ ...displayedForm, calculateActualTime: checked === true })} />
-            <span><strong className="block text-slate-700">Calcular pelo tempo real de uso</strong><span className="mt-1 block text-xs font-normal text-slate-500">Ativado: usa os minutos entre início e fim reais. Desativado: usa o período previsto.</span></span>
+            <span><strong className="block text-foreground">Calcular pelo tempo real de uso</strong><span className="mt-1 block text-xs font-normal text-muted-foreground">Ativado: usa os minutos entre início e fim reais. Desativado: usa o período previsto.</span></span>
           </label>
         </section>
-        <section className="order-first rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:col-span-2">
-          <span className="inline-flex rounded-xl bg-emerald-50 p-2.5 text-emerald-700"><Building2 size={21} /></span>
+        <section className="order-first rounded-2xl border border-border bg-card p-6 shadow-sm md:col-span-2">
+          <span className="inline-flex rounded-xl bg-secondary p-2.5 text-primary"><Building2 size={21} /></span>
           <h2 className="mt-4 text-lg font-semibold">Dados da Empresa</h2>
-          <p className="mt-2 text-sm text-slate-500">Informações cadastrais que serão usadas futuramente na emissão de notas fiscais.</p>
+          <p className="mt-2 text-sm text-muted-foreground">Informações cadastrais que serão usadas futuramente na emissão de notas fiscais.</p>
           <div className="mt-6 grid gap-4 md:grid-cols-2">
-            <label className="text-sm font-semibold text-slate-600">CNPJ<Input className="mt-2 uppercase" maxLength={18} placeholder="00.000.000/0000-00" value={displayedForm.companyTaxId} onChange={(event) => setForm({ ...displayedForm, companyTaxId: formatCnpj(event.target.value) })} /></label>
-            <label className="text-sm font-semibold text-slate-600">Nome<Input className="mt-2" maxLength={180} placeholder="Razão social" value={displayedForm.companyLegalName} onChange={(event) => setForm({ ...displayedForm, companyLegalName: event.target.value })} /></label>
-            <label className="text-sm font-semibold text-slate-600">Nome Fantasia<Input className="mt-2" maxLength={180} value={displayedForm.companyTradeName} onChange={(event) => setForm({ ...displayedForm, companyTradeName: event.target.value })} /></label>
-            <label className="text-sm font-semibold text-slate-600">Telefone<Input className="mt-2" inputMode="tel" maxLength={15} placeholder="(00) 00000-0000" value={displayedForm.companyPhone} onChange={(event) => setForm({ ...displayedForm, companyPhone: formatPhone(event.target.value) })} /></label>
-            <label className="text-sm font-semibold text-slate-600">CEP<div className="mt-2 flex gap-2"><Input inputMode="numeric" maxLength={9} placeholder="00000-000" value={displayedForm.companyPostalCode} onChange={(event) => setForm({ ...displayedForm, companyPostalCode: formatPostalCode(event.target.value) })} /><Button type="button" variant="outline" disabled={values.companyPostalCode.length !== 8 || postalCodeLookup.isPending} onClick={() => postalCodeLookup.mutate()}>{postalCodeLookup.isPending ? "Buscando..." : "Buscar CEP"}</Button></div></label>
+            <label className="text-sm font-semibold text-foreground">CNPJ<Input className="mt-2 uppercase" maxLength={18} placeholder="00.000.000/0000-00" value={displayedForm.companyTaxId} onChange={(event) => setForm({ ...displayedForm, companyTaxId: formatCnpj(event.target.value) })} /></label>
+            <label className="text-sm font-semibold text-foreground">Nome<Input className="mt-2" maxLength={180} placeholder="Razão social" value={displayedForm.companyLegalName} onChange={(event) => setForm({ ...displayedForm, companyLegalName: event.target.value })} /></label>
+            <label className="text-sm font-semibold text-foreground">Nome Fantasia<Input className="mt-2" maxLength={180} value={displayedForm.companyTradeName} onChange={(event) => setForm({ ...displayedForm, companyTradeName: event.target.value })} /></label>
+            <label className="text-sm font-semibold text-foreground">Telefone<Input className="mt-2" inputMode="tel" maxLength={15} placeholder="(00) 00000-0000" value={displayedForm.companyPhone} onChange={(event) => setForm({ ...displayedForm, companyPhone: formatPhone(event.target.value) })} /></label>
+            <label className="text-sm font-semibold text-foreground">CEP<div className="mt-2 flex gap-2"><Input inputMode="numeric" maxLength={9} placeholder="00000-000" value={displayedForm.companyPostalCode} onChange={(event) => setForm({ ...displayedForm, companyPostalCode: formatPostalCode(event.target.value) })} /><Button type="button" variant="outline" disabled={values.companyPostalCode.length !== 8 || postalCodeLookup.isPending} onClick={() => postalCodeLookup.mutate()}>{postalCodeLookup.isPending ? "Buscando..." : "Buscar CEP"}</Button></div></label>
             <div className="hidden md:block" aria-hidden="true" />
-            <label className="text-sm font-semibold text-slate-600 md:col-span-2">Endereço<Input className="mt-2" maxLength={250} placeholder="Logradouro, número e complemento" value={displayedForm.companyAddress} onChange={(event) => setForm({ ...displayedForm, companyAddress: event.target.value })} /></label>
-            <label className="flex flex-col text-sm font-semibold text-slate-600">Cidade<Input className="mt-2" maxLength={120} value={displayedForm.companyCity} onChange={(event) => setForm({ ...displayedForm, companyCity: event.target.value })} /></label>
-            <label className="flex flex-col text-sm font-semibold text-slate-600">UF<Input className="mt-2 w-24 uppercase" maxLength={2} placeholder="SP" value={displayedForm.companyState} onChange={(event) => setForm({ ...displayedForm, companyState: event.target.value.replace(/[^a-z]/gi, "").slice(0, 2).toUpperCase() })} /></label>
+            <label className="text-sm font-semibold text-foreground md:col-span-2">Endereço<Input className="mt-2" maxLength={250} placeholder="Logradouro, número e complemento" value={displayedForm.companyAddress} onChange={(event) => setForm({ ...displayedForm, companyAddress: event.target.value })} /></label>
+            <label className="flex flex-col text-sm font-semibold text-foreground">Cidade<Input className="mt-2" maxLength={120} value={displayedForm.companyCity} onChange={(event) => setForm({ ...displayedForm, companyCity: event.target.value })} /></label>
+            <label className="flex flex-col text-sm font-semibold text-foreground">UF<Input className="mt-2 w-24 uppercase" maxLength={2} placeholder="SP" value={displayedForm.companyState} onChange={(event) => setForm({ ...displayedForm, companyState: event.target.value.replace(/[^a-z]/gi, "").slice(0, 2).toUpperCase() })} /></label>
           </div>
-          {!companyValid && <p className="mt-3 text-xs text-rose-700">Confira o CNPJ (12 letras ou números e 2 dígitos verificadores), o CEP (8 dígitos), o telefone (10 ou 11 dígitos) e a UF (2 letras).</p>}
+          {!companyValid && <p className="mt-3 text-xs text-destructive">Confira o CNPJ (12 letras ou números e 2 dígitos verificadores), o CEP (8 dígitos), o telefone (10 ou 11 dígitos) e a UF (2 letras).</p>}
         </section>
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:col-span-2">
-          <span className="inline-flex rounded-xl bg-emerald-50 p-2.5 text-emerald-700"><Network size={21} /></span>
+        <section className="rounded-2xl border border-border bg-card p-6 shadow-sm md:col-span-2">
+          <span className="inline-flex rounded-xl bg-secondary p-2.5 text-primary"><Network size={21} /></span>
           <h2 className="mt-4 text-lg font-semibold">Rede dos AX Devices</h2>
-          <p className="mt-2 text-sm text-slate-500">Escolha a interface da máquina ARENAX conectada à mesma rede dos AX Devices.</p>
+          <p className="mt-2 text-sm text-muted-foreground">Escolha a interface da máquina ARENAX conectada à mesma rede dos AX Devices.</p>
           <div className="mt-6 max-w-xl">
-            <label className="text-sm font-semibold text-slate-600">
+            <label className="text-sm font-semibold text-foreground">
               Interface de rede
               <Combobox
                 value={displayedForm.axDeviceNetworkInterfaceId}
@@ -288,48 +288,48 @@ export function SettingsPage() {
               <RefreshCw className={networkInterfaces.isFetching ? "animate-spin" : ""} size={16} /> Detectar novamente
             </Button>
           </div>
-          {networkInterfaces.isError && <p className="mt-3 text-xs text-rose-700">Não foi possível consultar as interfaces. Verifique se o ARENAX Local Agent está ativo.</p>}
-          {settings.data.ax_device_network_address && <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Endereço atual do AX Device</p><code className="mt-1 block break-all text-xs text-slate-700">http://{settings.data.ax_device_network_address}:8000/api/v1/events/button-pressed</code></div>}
+          {networkInterfaces.isError && <p className="mt-3 text-xs text-destructive">Não foi possível consultar as interfaces. Verifique se o ARENAX Local Agent está ativo.</p>}
+          {settings.data.ax_device_network_address && <div className="mt-4 rounded-xl border border-secondary bg-secondary p-4"><p className="text-xs font-semibold uppercase tracking-wide text-primary">Endereço atual do AX Device</p><code className="mt-1 block break-all text-xs text-foreground">http://{settings.data.ax_device_network_address}:8000/api/v1/events/button-pressed</code></div>}
         </section>
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:col-span-2">
-          <span className="inline-flex rounded-xl bg-emerald-50 p-2.5 text-emerald-700"><HardDrive size={21} /></span>
+        <section className="rounded-2xl border border-border bg-card p-6 shadow-sm md:col-span-2">
+          <span className="inline-flex rounded-xl bg-secondary p-2.5 text-primary"><HardDrive size={21} /></span>
           <h2 className="mt-4 text-lg font-semibold">Armazenamento de Replays</h2>
-          <p className="mt-2 text-sm text-slate-500">Por padrão, nenhum Replay é removido automaticamente.</p>
-          <label className="mt-6 block text-sm font-semibold text-slate-600">Local atual<Input className="mt-2 font-mono text-xs" value={settings.data.media_storage_path} readOnly /></label>
+          <p className="mt-2 text-sm text-muted-foreground">Por padrão, nenhum Replay é removido automaticamente.</p>
+          <label className="mt-6 block text-sm font-semibold text-foreground">Local atual<Input className="mt-2 font-mono text-xs" value={settings.data.media_storage_path} readOnly /></label>
           <div className="mt-4 flex flex-col items-start gap-3">
             <Button type="button" variant="outline" disabled={chooseStorage.isPending || applyStorage.isPending} onClick={() => chooseStorage.mutate()}>
               <FolderOpen size={17} />{chooseStorage.isPending ? "Aguardando escolha..." : "Escolher outra pasta"}
             </Button>
-            {selectedStoragePath && <div className="w-full max-w-2xl rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Nova pasta escolhida</p>
-              <p className="mt-1 break-all font-mono text-xs text-slate-700">{selectedStoragePath}</p>
+            {selectedStoragePath && <div className="w-full max-w-2xl rounded-xl border border-secondary bg-secondary p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary">Nova pasta escolhida</p>
+              <p className="mt-1 break-all font-mono text-xs text-foreground">{selectedStoragePath}</p>
               <div className="mt-3 flex gap-2">
                 <ConfirmationAlertDialog trigger={<Button type="button">Usar esta pasta</Button>} title="Alterar o armazenamento dos Replays?" description="Os processos de vídeo serão pausados, os arquivos atuais serão copiados e os componentes serão reiniciados. A pasta anterior será preservada." confirmLabel="Alterar armazenamento" pending={applyStorage.isPending} onConfirm={() => applyStorage.mutate()} />
                 <Button type="button" variant="ghost" onClick={() => setSelectedStoragePath(null)}>Cancelar</Button>
               </div>
             </div>}
           </div>
-          <p className="mt-2 text-xs text-slate-500">A janela de escolha abre na máquina onde a ARENAX está instalada. Nenhum comando manual é necessário.</p>
-          <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+          <p className="mt-2 text-xs text-muted-foreground">A janela de escolha abre na máquina onde a ARENAX está instalada. Nenhum comando manual é necessário.</p>
+          <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-muted p-4 text-sm">
             <Checkbox checked={!displayedForm.removeAutomatically} onCheckedChange={(checked) => setForm({ ...displayedForm, removeAutomatically: checked !== true })} />
-            <span><strong className="block text-slate-700">Não remover automaticamente</strong><span className="mt-1 block text-xs font-normal text-slate-500">Os arquivos permanecem até uma alteração explícita desta política.</span></span>
+            <span><strong className="block text-foreground">Não remover automaticamente</strong><span className="mt-1 block text-xs font-normal text-muted-foreground">Os arquivos permanecem até uma alteração explícita desta política.</span></span>
           </label>
-          <label className="mt-5 block max-w-xs text-sm font-semibold text-slate-600">Remover Replays depois de<div className="relative mt-2"><Input className="pr-16" type="number" min="1" step="1" disabled={!displayedForm.removeAutomatically} value={displayedForm.retentionDays} onChange={(event) => setForm({ ...displayedForm, retentionDays: event.target.value })} /><span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-slate-400">dias</span></div></label>
-          {!retentionValid && <p className="mt-2 text-xs text-rose-700">Informe uma quantidade de dias maior que zero.</p>}
+          <label className="mt-5 block max-w-xs text-sm font-semibold text-foreground">Remover Replays depois de<div className="relative mt-2"><Input className="pr-16" type="number" min="1" step="1" disabled={!displayedForm.removeAutomatically} value={displayedForm.retentionDays} onChange={(event) => setForm({ ...displayedForm, retentionDays: event.target.value })} /><span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-muted-foreground">dias</span></div></label>
+          {!retentionValid && <p className="mt-2 text-xs text-destructive">Informe uma quantidade de dias maior que zero.</p>}
         </section>
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:col-span-2">
-          <span className="inline-flex rounded-xl bg-emerald-50 p-2.5 text-emerald-700"><Video size={21} /></span>
+        <section className="rounded-2xl border border-border bg-card p-6 shadow-sm md:col-span-2">
+          <span className="inline-flex rounded-xl bg-secondary p-2.5 text-primary"><Video size={21} /></span>
           <h2 className="mt-4 text-lg font-semibold">Replays</h2>
-          <p className="mt-2 text-sm text-slate-500">Durações anterior e posterior ao acionamento.</p>
+          <p className="mt-2 text-sm text-muted-foreground">Durações anterior e posterior ao acionamento.</p>
           <div className="mt-6 grid gap-4 sm:grid-cols-2">
-            <label className="text-sm font-semibold text-slate-600">Antes do acionamento<div className="relative mt-2"><Input className="pr-24" type="number" min="0" step="1" value={displayedForm.replayPreSeconds} onChange={(event) => setForm({ ...displayedForm, replayPreSeconds: event.target.value })} required /><span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-slate-400">segundos</span></div></label>
-            <label className="text-sm font-semibold text-slate-600">Depois do acionamento<div className="relative mt-2"><Input className="pr-24" type="number" min="0" step="1" value={displayedForm.replayPostSeconds} onChange={(event) => setForm({ ...displayedForm, replayPostSeconds: event.target.value })} required /><span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-slate-400">segundos</span></div></label>
+            <label className="text-sm font-semibold text-foreground">Antes do acionamento<div className="relative mt-2"><Input className="pr-24" type="number" min="0" step="1" value={displayedForm.replayPreSeconds} onChange={(event) => setForm({ ...displayedForm, replayPreSeconds: event.target.value })} required /><span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-muted-foreground">segundos</span></div></label>
+            <label className="text-sm font-semibold text-foreground">Depois do acionamento<div className="relative mt-2"><Input className="pr-24" type="number" min="0" step="1" value={displayedForm.replayPostSeconds} onChange={(event) => setForm({ ...displayedForm, replayPostSeconds: event.target.value })} required /><span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-muted-foreground">segundos</span></div></label>
           </div>
-          <p className={`mt-3 text-xs ${valid ? "text-slate-500" : "text-rose-700"}`}>Duração total do Replay: {Number.isFinite(values.replayPreSeconds + values.replayPostSeconds) ? values.replayPreSeconds + values.replayPostSeconds : 0} segundos.</p>
+          <p className={`mt-3 text-xs ${valid ? "text-muted-foreground" : "text-destructive"}`}>Duração total do Replay: {Number.isFinite(values.replayPreSeconds + values.replayPostSeconds) ? values.replayPreSeconds + values.replayPostSeconds : 0} segundos.</p>
         </section>
         </div>
         <div className="mt-6 flex flex-col-reverse items-start justify-between gap-3 sm:flex-row sm:items-center">
-          <p className="flex items-center gap-1.5 text-xs text-slate-500">{license.isError || license.data?.check_status === "unavailable" ? <CloudOff className="text-rose-600" size={16} aria-label="API de licença indisponível" /> : license.data?.check_status === "consulted" ? <CloudCheck className="text-emerald-600" size={16} aria-label="API de licença consultada" /> : <CloudAlert className="text-amber-600" size={16} aria-label="API de licença ainda não consultada" />}<span>Última atualização: {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(settings.data.updated_at))}</span></p>
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">{license.isError || license.data?.check_status === "unavailable" ? <CloudOff className="text-destructive" size={16} aria-label="API de licença indisponível" /> : license.data?.check_status === "consulted" ? <CloudCheck className="text-primary" size={16} aria-label="API de licença consultada" /> : <CloudAlert className="text-warning-foreground" size={16} aria-label="API de licença ainda não consultada" />}<span>Última atualização: {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(settings.data.updated_at))}</span></p>
           <Button type="submit" disabled={!valid || !retentionValid || !companyValid || !dirty || save.isPending}>{save.isPending ? "Salvando..." : "Salvar configurações"}</Button>
         </div>
       </form>}

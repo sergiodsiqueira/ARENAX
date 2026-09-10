@@ -1,9 +1,7 @@
+import { FormModal } from "../components/ui/form-modal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CalendarDays,
-  Check,
-  ChevronLeft,
-  ChevronRight,
   Clock3,
   MapPin,
   Phone,
@@ -11,16 +9,18 @@ import {
   Radio,
 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router";
+import { Link, useNavigate } from "react-router";
+import { useUrlFilter } from "../hooks/use-url-filter";
 import { toast } from "sonner";
 import { AppShell } from "../components/AppShell";
+import { Button } from "../components/ui/button";
 import { DatePicker } from "../components/ui/date-picker";
 import { ConfirmationAlertDialog } from "../components/ui/confirmation-alert-dialog";
 import { Combobox } from "../components/ui/combobox";
 import { Checkbox } from "../components/ui/checkbox";
 import { Input } from "../components/ui/input";
+import { FieldLegend, FieldSet } from "../components/ui/field";
 import { ModalCloseButton } from "../components/ui/modal-close-button";
-import { useModalEscape } from "../hooks/use-modal-escape";
 import { SessionSchedulePicker } from "../components/ui/session-schedule-picker";
 import { Textarea } from "../components/ui/textarea";
 import {
@@ -47,13 +47,13 @@ const statusLabels: Record<SessionStatus, string> = {
   no_show: "Não compareceu",
 };
 const statusClasses: Record<SessionStatus, string> = {
-  scheduled: "bg-sky-100 text-sky-800",
-  confirmed: "bg-emerald-100 text-emerald-800",
-  in_progress: "bg-emerald-700 text-white",
-  finished: "bg-slate-200 text-slate-700",
-  archived: "bg-slate-100 text-slate-500",
-  cancelled: "bg-rose-100 text-rose-800",
-  no_show: "bg-amber-100 text-amber-800",
+  scheduled: "bg-secondary text-primary",
+  confirmed: "bg-secondary text-primary",
+  in_progress: "bg-primary text-primary-foreground",
+  finished: "bg-border text-foreground",
+  archived: "bg-muted text-muted-foreground",
+  cancelled: "bg-danger-muted text-destructive",
+  no_show: "bg-warning-muted text-warning-foreground",
 };
 
 function dayWindow(value: string) {
@@ -106,24 +106,16 @@ function formatDuration(start: string, end: string) {
 
 export function AgendaPage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
-  const [day, setDay] = useState(() => {
-    const requestedDay = searchParams.get("date");
-    return requestedDay && /^\d{4}-\d{2}-\d{2}$/.test(requestedDay)
-      ? requestedDay
-      : dateInput(new Date());
-  });
+  const [day, setDay] = useUrlFilter("date", dateInput(new Date()), (value) => /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(new Date(`${value}T12:00:00`).getTime()));
   const [creating, setCreating] = useState(false);
   const [responsibleId, setResponsibleId] = useState("");
   const [spaceIds, setSpaceIds] = useState<string[]>([]);
   const [period, setPeriod] = useState(initialPeriod);
-  const [view, setView] = useState<"day" | "in_progress">("day");
-  const [spaceFilter, setSpaceFilter] = useState("all");
+  const [view, setView] = useUrlFilter<"day" | "in_progress">("view", "day", (value) => value === "day" || value === "in_progress");
+  const [spaceFilter, setSpaceFilter] = useUrlFilter<string>("space", "all");
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [clientDraft, setClientDraft] = useState({ name: "", phone: "", email: "", notes: "" });
-  useModalEscape(creating && !editingClient, () => setCreating(false));
-  useModalEscape(Boolean(editingClient), () => setEditingClient(null));
   const window = useMemo(() => dayWindow(day), [day]);
   const user = useQuery({
     queryKey: ["current-user"],
@@ -243,17 +235,12 @@ export function AgendaPage() {
   );
   const spaceFilterOptions = useMemo(
     () => [
-      { value: "all", label: "Todos os Espaços" },
+      { value: "all", label: "Todos" },
       ...(spaces.data ?? [])
         .map((space) => ({ value: space.id, label: space.name })),
     ],
     [spaces.data],
   );
-  const moveDay = (amount: number) => {
-    const next = new Date(`${day}T12:00:00`);
-    next.setDate(next.getDate() + amount);
-    setDay(dateInput(next));
-  };
   const openCreateSession = () => {
     setPeriod(initialPeriodForDay(day));
     setCreating(true);
@@ -283,16 +270,16 @@ export function AgendaPage() {
 
   return (
     <AppShell user={user.data}>
-      <main className="mx-auto max-w-7xl px-5 py-7 sm:px-8 sm:py-10">
-        <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
+      <main className="page-shell flex flex-col lg:h-dvh lg:min-h-0">
+        <div className="flex shrink-0 flex-col justify-between gap-5 sm:flex-row sm:items-end">
           <div>
-            <p className="mb-2 text-sm font-semibold tracking-wide text-emerald-700">
+            <p className="mb-2 text-sm font-semibold tracking-wide text-primary">
               AGENDA
             </p>
-            <h1 className="text-3xl font-semibold tracking-tight">
+            <h1 className="page-heading">
               Sessões da Arena
             </h1>
-            <p className="mt-2 text-slate-500">
+            <p className="mt-2 text-muted-foreground">
               Planeje a utilização dos Espaços e acompanhe confirmações.
             </p>
           </div>
@@ -312,69 +299,57 @@ export function AgendaPage() {
             </button>
           </div>
         </div>
-        {view === "day" ? <section className="mt-7 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center justify-between gap-2">
-            <button
-              className="rounded-lg p-2 hover:bg-slate-100"
-              onClick={() => moveDay(-1)}
-              aria-label="Dia anterior"
-            >
-              <ChevronLeft />
-            </button>
-            <DatePicker value={day} onChange={setDay} markedDates={markedDates} />
-            <button
-              className="rounded-lg p-2 hover:bg-slate-100"
-              onClick={() => moveDay(1)}
-              aria-label="Próximo dia"
-            >
-              <ChevronRight />
-            </button>
-          </div>
-          <button
-            className="text-sm font-semibold text-emerald-700"
+        <div className={view === "day" ? "mt-7 grid min-h-0 items-start gap-5 lg:flex-1 lg:grid-cols-[minmax(0,7fr)_minmax(0,3fr)] lg:grid-rows-[minmax(0,1fr)] lg:items-stretch" : "mt-7 flex min-h-0 flex-col gap-5 lg:flex-1"}>
+        {view === "day" ? <section className="flex min-h-0 min-w-0 flex-col items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm lg:col-start-2 lg:row-start-1 lg:overflow-y-auto [&>*]:shrink-0">
+          <DatePicker inline value={day} onChange={setDay} markedDates={markedDates} className="w-full min-w-0" />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="border-primary bg-transparent px-6 text-primary"
             onClick={() => setDay(dateInput(new Date()))}
           >
             Hoje
-          </button>
-        </section> : <section className="mt-7 flex items-center gap-3 rounded-2xl bg-secondary px-5 py-4 text-primary"><span className="grid size-9 place-items-center rounded-xl bg-card"><Radio size={18} /></span><div><p className="font-semibold">Sessões em andamento</p><p className="text-sm text-muted-foreground">Exibindo todas as Sessões atualmente em curso na Arena.</p></div></section>}
+          </Button>
+          <FieldSet className="mt-3 w-full min-w-0 gap-3" disabled={spaces.isLoading}>
+            <FieldLegend id="agenda-space-label" variant="label">Espaço</FieldLegend>
+            <Combobox
+              className="mt-0"
+              value={spaceFilter}
+              onValueChange={setSpaceFilter}
+              options={spaceFilterOptions}
+              placeholder="Todos"
+              searchPlaceholder="Buscar Espaço..."
+              emptyText="Nenhum Espaço encontrado."
+              disabled={spaces.isLoading}
+            />
+          </FieldSet>
+        </section> : <section className="flex items-center gap-3 rounded-2xl bg-secondary px-5 py-4 text-primary"><span className="grid size-9 place-items-center rounded-xl bg-card"><Radio size={18} /></span><div><p className="font-semibold">Sessões em andamento</p><p className="text-sm text-muted-foreground">Exibindo todas as Sessões atualmente em curso na Arena.</p></div></section>}
 
-        {view === "day" && (
-          <section className="mt-4 flex justify-start">
-            <label className="w-full text-sm font-semibold text-slate-600 sm:w-72">
-              Espaço
-              <Combobox
-                className="mt-2"
-                value={spaceFilter}
-                onValueChange={setSpaceFilter}
-                options={spaceFilterOptions}
-                placeholder="Todos os Espaços"
-                searchPlaceholder="Buscar Espaço..."
-                emptyText="Nenhum Espaço encontrado."
-                disabled={spaces.isLoading}
-              />
-            </label>
-          </section>
-        )}
-
-        <section className="mt-5 space-y-3">
+        <div className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm lg:col-start-1 lg:row-start-1 lg:flex-1">
+        <section
+          aria-label={view === "day" ? "Sessões da Agenda" : "Sessões em andamento"}
+          tabIndex={0}
+          className="max-h-[70dvh] min-h-0 space-y-3 overflow-y-auto overscroll-contain rounded-lg p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring lg:max-h-none lg:flex-1"
+        >
           {displayedSessions.isLoading &&
             [1, 2, 3].map((item) => (
               <div
                 key={item}
-                className="h-32 animate-pulse rounded-2xl border border-slate-200 bg-white"
+                className="h-32 animate-pulse rounded-2xl border border-border bg-card"
               />
             ))}
           {displayedSessions.isError && (
-            <div className="rounded-2xl border border-rose-200 bg-white p-6 text-rose-800">
+            <div className="rounded-2xl border border-danger-border bg-card p-6 text-destructive">
               Não foi possível carregar a Agenda.
             </div>
           )}
           {!displayedSessions.isLoading &&
             !displayedSessions.isError &&
             !displayedSessions.data?.length && (
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
-                <CalendarDays className="mx-auto text-slate-300" size={36} />
-                <p className="mt-3 font-semibold text-slate-600">
+              <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center">
+                <CalendarDays className="mx-auto text-muted-foreground" size={36} />
+                <p className="mt-3 font-semibold text-foreground">
                   {view === "in_progress"
                     ? "Nenhuma Sessão em andamento"
                     : spaceFilter === "all"
@@ -382,7 +357,7 @@ export function AgendaPage() {
                       : "Nenhuma Sessão neste Espaço"}
                 </p>
                 {view === "day" && <button
-                  className="mt-4 text-sm font-semibold text-emerald-700"
+                  className="mt-4 text-sm font-semibold text-primary"
                   onClick={openCreateSession}
                 >
                   Agendar a primeira Sessão
@@ -402,27 +377,29 @@ export function AgendaPage() {
                 transition.mutate({ id: session.id, action })
               }
               pending={transition.isPending}
-              agendaDate={day}
+              returnTo={`/agenda?${new URLSearchParams({ date: day, space: spaceFilter, view })}`}
             />
           ))}
         </section>
+        </div>
+        </div>
 
         {creating && (
-          <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/45 px-5 py-8">
+          <FormModal title="Nova Sessão" onClose={() => setCreating(false)} size="lg">
             <form
-              className="mx-auto w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl"
+              className="w-full p-6"
               onSubmit={submit}
             >
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h2 className="text-xl font-semibold">Nova Sessão</h2>
-                  <p className="mt-1 text-sm text-slate-500">
+                  <p className="mt-1 text-sm text-muted-foreground">
                     A Sessão nasce Agendada e deve utilizar ao menos um Espaço.
                   </p>
                 </div>
                 <ModalCloseButton onClick={() => setCreating(false)} />
               </div>
-              <label className="mt-6 block text-sm font-semibold text-slate-600">
+              <label className="mt-6 block text-sm font-semibold text-foreground">
                 Cliente Responsável
                 <Combobox
                   value={responsibleId}
@@ -441,7 +418,7 @@ export function AgendaPage() {
                 />
               </label>
               <fieldset className="mt-5">
-                <legend className="text-sm font-semibold text-slate-600">
+                <legend className="text-sm font-semibold text-foreground">
                   Espaços
                 </legend>
                 <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -450,7 +427,7 @@ export function AgendaPage() {
                     .map((space) => (
                     <label
                       key={space.id}
-                      className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm ${spaceIds.includes(space.id) ? "border-emerald-500 bg-emerald-50" : "border-slate-200"}`}
+                      className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm ${spaceIds.includes(space.id) ? "border-primary bg-secondary" : "border-border"}`}
                     >
                       <Checkbox
                         checked={spaceIds.includes(space.id)}
@@ -462,17 +439,17 @@ export function AgendaPage() {
                           )
                         }
                       />
-                      <MapPin size={17} className="text-emerald-700" />
+                      <MapPin size={17} className="text-primary" />
                       <span>
                         {space.name}
-                        <small className="ml-2 text-emerald-600">Ativo</small>
+                        <small className="ml-2 text-primary">Ativo</small>
                       </span>
                     </label>
                     ))}
                 </div>
               </fieldset>
               <div className="mt-5">
-                <p className="mb-2 text-sm font-semibold text-slate-600">Data e período previstos</p>
+                <p className="mb-2 text-sm font-semibold text-foreground">Data e período previstos</p>
                 <SessionSchedulePicker start={period.start} end={period.end} onChange={setPeriod} />
               </div>
               <div className="mt-7 flex justify-end gap-2">
@@ -491,13 +468,13 @@ export function AgendaPage() {
                 </button>
               </div>
             </form>
-          </div>
+          </FormModal>
         )}
 
         {editingClient && (
-          <div className="fixed inset-0 z-[60] overflow-y-auto bg-slate-950/55 px-5 py-8">
+          <FormModal title="Editar Cliente" onClose={() => setEditingClient(null)} size="md">
             <form
-              className="mx-auto w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl"
+              className="w-full p-6"
               onSubmit={(event) => {
                 event.preventDefault();
                 if (clientDraft.name.trim()) saveClient.mutate();
@@ -506,14 +483,14 @@ export function AgendaPage() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h2 className="text-xl font-semibold">Editar Cliente</h2>
-                  <p className="mt-1 text-sm text-slate-500">
+                  <p className="mt-1 text-sm text-muted-foreground">
                     Atualize os dados de contato sem sair do agendamento.
                   </p>
                 </div>
                 <ModalCloseButton onClick={() => setEditingClient(null)} />
               </div>
               <div className="mt-6 grid gap-4">
-                <label className="text-sm font-semibold text-slate-600">
+                <label className="text-sm font-semibold text-foreground">
                   Nome
                   <Input
                     className="mt-2"
@@ -521,7 +498,7 @@ export function AgendaPage() {
                     onChange={(event) => setClientDraft((current) => ({ ...current, name: event.target.value }))}
                   />
                 </label>
-                <label className="text-sm font-semibold text-slate-600">
+                <label className="text-sm font-semibold text-foreground">
                   Telefone
                   <Input
                     className="mt-2"
@@ -532,7 +509,7 @@ export function AgendaPage() {
                     onChange={(event) => setClientDraft((current) => ({ ...current, phone: formatPhone(event.target.value) }))}
                   />
                 </label>
-                <label className="text-sm font-semibold text-slate-600">
+                <label className="text-sm font-semibold text-foreground">
                   E-mail
                   <Input
                     className="mt-2"
@@ -541,7 +518,7 @@ export function AgendaPage() {
                     onChange={(event) => setClientDraft((current) => ({ ...current, email: event.target.value }))}
                   />
                 </label>
-                <label className="text-sm font-semibold text-slate-600">
+                <label className="text-sm font-semibold text-foreground">
                   Observações
                   <Textarea
                     className="mt-2"
@@ -562,7 +539,7 @@ export function AgendaPage() {
                 </button>
               </div>
             </form>
-          </div>
+          </FormModal>
         )}
       </main>
     </AppShell>
@@ -576,7 +553,7 @@ function SessionCard({
   spaces,
   onAction,
   pending,
-  agendaDate,
+  returnTo,
 }: {
   session: ArenaSession;
   clientName: string;
@@ -584,7 +561,7 @@ function SessionCard({
   spaces: string[];
   onAction: (action: "confirm" | "start" | "cancel" | "no_show") => void;
   pending: boolean;
-  agendaDate: string;
+  returnTo: string;
 }) {
   const time = (value: string) =>
     new Intl.DateTimeFormat("pt-BR", {
@@ -592,38 +569,37 @@ function SessionCard({
       minute: "2-digit",
     }).format(new Date(value));
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+    <article className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <div className="flex min-w-0 flex-col gap-4">
         <div className="flex min-w-0 gap-4">
-          <div className="flex w-16 shrink-0 flex-col items-center justify-center rounded-xl bg-slate-950 py-3 text-white">
+          <div className="flex w-20 shrink-0 flex-col items-center justify-center rounded-xl bg-secondary py-3 text-primary">
             <strong>{time(session.scheduled_start)}</strong>
-            <span className="mt-1 text-xs text-slate-300">
+            <span className="mt-1 text-sm text-primary">
               {time(session.scheduled_end)}
             </span>
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="font-semibold">{clientName}</h2>
+              <h2 className="break-words font-semibold [overflow-wrap:anywhere]">{clientName}</h2>
               <span
-                className={`rounded-full px-2.5 py-1 text-[.68rem] font-semibold ${statusClasses[session.status]}`}
+                className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusClasses[session.status]}`}
               >
                 {statusLabels[session.status]}
               </span>
             </div>
-            <p className="mt-2 flex items-center gap-2 text-sm text-slate-500">
-              <MapPin size={15} /> {spaces.join(" · ")}
+            <p className="mt-2 flex items-start gap-2 text-sm text-muted-foreground">
+              <MapPin size={16} className="mt-0.5 shrink-0" /> <span className="min-w-0 break-words [overflow-wrap:anywhere]">{spaces.join(" · ")}</span>
             </p>
-            <p className="mt-1 flex items-center gap-2 text-xs text-slate-400">
-              <Phone size={14} /> {clientPhone ? formatPhone(clientPhone) : "Telefone não informado"}
-              <span aria-hidden="true">·</span>
-              <Clock3 size={14} /> {formatDuration(session.scheduled_start, session.scheduled_end)}
-            </p>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground">
+              <p className="flex items-center gap-2"><Phone size={16} className="shrink-0" /> {clientPhone ? formatPhone(clientPhone) : "Telefone não informado"}</p>
+              <p className="flex items-center gap-2"><Clock3 size={16} className="shrink-0" /> {formatDuration(session.scheduled_start, session.scheduled_end)}</p>
+            </div>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 border-t border-border pt-4">
           <Link
             className="operation-button"
-            to={`/sessoes/${session.id}?agendaDate=${encodeURIComponent(agendaDate)}`}
+            to={`/sessoes/${session.id}?returnTo=${encodeURIComponent(returnTo)}`}
           >
             Ver dossiê
           </Link>
@@ -633,7 +609,7 @@ function SessionCard({
               disabled={pending}
               onClick={() => onAction("confirm")}
             >
-              <Check size={16} /> Confirmar
+              Confirmar
             </button>
           )}
           {(session.status === "scheduled" ||
@@ -646,25 +622,18 @@ function SessionCard({
               Iniciar
             </button>
           )}
-          {(session.status === "scheduled" ||
-            session.status === "confirmed") && (
-            <button
-              className="operation-button"
-              disabled={pending}
-              onClick={() => onAction("no_show")}
-            >
-              Não compareceu
-            </button>
-          )}
           {["scheduled", "confirmed", "in_progress"].includes(
             session.status,
           ) && (
             <ConfirmationAlertDialog
               title="Cancelar Sessão?"
-              description="Se a Sessão ainda não tiver eventos associados, a agenda será excluída definitivamente. Sessões com histórico operacional serão preservadas como canceladas."
-              confirmLabel="Cancelar Sessão"
+              description={`Ao cancelar, se a Sessão ainda não tiver eventos associados, a agenda será excluída definitivamente. Sessões com histórico operacional serão preservadas como canceladas.${session.status === "scheduled" || session.status === "confirmed" ? " Se o Cliente não veio, escolha Não compareceu para registrar a ausência e preservar a Sessão." : ""}`}
+              confirmLabel="Cancelar"
               pending={pending}
               onConfirm={() => onAction("cancel")}
+              alternativeAction={session.status === "scheduled" || session.status === "confirmed"
+                ? { label: "Não compareceu", onSelect: () => onAction("no_show") }
+                : undefined}
               trigger={<button className="operation-button" disabled={pending}>Cancelar</button>}
             />
           )}

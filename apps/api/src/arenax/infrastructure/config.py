@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     access_cookie_secure: bool = False
     access_duration_hours: int = 12
     persistent_access_duration_days: int = 30
+    password_reset_duration_minutes: int = 30
+    expose_local_password_reset_url: bool = True
     media_root: str = "/media"
     media_host_path: str = "./media"
     host_agent_url: str = "http://host.docker.internal:8765"

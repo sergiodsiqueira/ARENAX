@@ -18,6 +18,7 @@ permanecer em inglês enquanto os contratos existentes estiverem em vigor.
 | `caixa_de_saida` | Entrega confiável dos pedidos de Replay. |
 | `usuarios` | Identidades autorizadas a acessar a plataforma. |
 | `acessos` | Sessões de autenticação revogáveis dos Usuários. |
+| `tokens_redefinicao_senha` | Tokens opacos temporários usados na recuperação local de senha. |
 | `configuracoes` | Valores operacionais globais da Arena no MVP. |
 
 ## Colunas principais
@@ -40,6 +41,8 @@ permanecer em inglês enquanto os contratos existentes estiverem em vigor.
 - `caixa_de_saida`: `tipo`, `agregado_id`, `dados`, `publicado_em`.
 - `usuarios`: `nome`, `email`, `senha_hash`, `papel`, `status`, `ultimo_acesso_em`.
 - `acessos`: `usuario_id`, `token_hash`, `criado_em`, `expira_em`, `revogado_em`.
+- `tokens_redefinicao_senha`: `usuario_id`, `token_hash`, `criado_em`,
+  `expira_em`, `usado_em`.
 - `configuracoes`: `duracao_padrao_sessao_minutos`,
   `duracao_replay_anterior_segundos`, `duracao_replay_posterior_segundos`,
   `calcular_tempo_real`, `retencao_replays_dias` anulável, `cnpj`, `nome_empresa`,

@@ -24,7 +24,7 @@ class LicenseGateway:
     def _check(self, tax_id: str) -> dict:
         request = Request(
             f"{self.base_url}/{quote(tax_id, safe='')}",
-            headers={"Accept": "application/json"},
+            headers={"Accept": "application/json", "User-Agent": "ARENAX/0.1"},
         )
         try:
             with urlopen(request, timeout=5) as response:
@@ -34,7 +34,7 @@ class LicenseGateway:
 
         allowed = payload.get("liberado")
         valid_until_raw = payload.get("validade")
-        check_again = payload.get("verificarNovamente")
+        check_again = payload.get("verificarNovamenteEm", payload.get("verificarNovamente"))
         if not isinstance(allowed, bool) or not isinstance(check_again, int) or check_again <= 0:
             raise LicenseCheckUnavailable("Resposta inválida do serviço de licenças")
         valid_until = None

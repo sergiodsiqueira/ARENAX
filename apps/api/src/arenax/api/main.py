@@ -3,13 +3,18 @@ import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Annotated
+from urllib.parse import quote
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
-from arenax.application.auth import AuthenticationService, UserAdministrationService
+from arenax.application.auth import (
+    AuthenticationService,
+    PasswordRecoveryService,
+    UserAdministrationService,
+)
 from arenax.application.license import LicenseService
 from arenax.application.use_cases import (
     ArenaInfrastructureService,
@@ -66,6 +71,8 @@ from .schemas import (
     EquipmentResponse,
     ExpectedAmountResponse,
     ExtendSessionRequest,
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
     HealthCenterResponse,
     LicenseStatusResponse,
     LoginRequest,
@@ -78,6 +85,7 @@ from .schemas import (
     PaymentResponse,
     PostalCodeResponse,
     RegisterPaymentRequest,
+    ResetPasswordRequest,
     ResetUserPasswordRequest,
     SessionResponse,
     SpaceResponse,
@@ -100,6 +108,9 @@ authentication = AuthenticationService(
     SqlAlchemyUnitOfWork, password_hasher, issue_access_token, hash_access_token
 )
 user_administration = UserAdministrationService(SqlAlchemyUnitOfWork, password_hasher)
+password_recovery = PasswordRecoveryService(
+    SqlAlchemyUnitOfWork, password_hasher, issue_access_token, hash_access_token
+)
 live_gateway = MediaMtxGateway(
     settings.mediamtx_api_url,
     settings.mediamtx_public_webrtc_url,
@@ -115,6 +126,8 @@ LICENSE_EXEMPT_PATHS = {
     "/api/v1/health",
     "/api/v1/license-status",
     "/api/v1/auth/login",
+    "/api/v1/auth/forgot-password",
+    "/api/v1/auth/reset-password",
     "/api/v1/auth/logout",
     "/api/v1/auth/me",
     "/docs",
@@ -220,6 +233,32 @@ async def login(request: LoginRequest, response: Response):
     )
     response.headers["Cache-Control"] = "no-store"
     return LoginResponse(user=user_response(result.user))
+
+
+@app.post("/api/v1/auth/forgot-password", response_model=ForgotPasswordResponse)
+async def forgot_password(request: ForgotPasswordRequest):
+    now = datetime.now(UTC)
+    result = await password_recovery.request_reset(
+        request.email,
+        now,
+        timedelta(minutes=settings.password_reset_duration_minutes),
+    )
+    message = "Se este e-mail estiver cadastrado, enviaremos instruções para redefinir sua senha."
+    reset_url = None
+    if result.token and settings.expose_local_password_reset_url:
+        reset_url = f"{settings.web_origin.rstrip('/')}/redefinir-senha?token={quote(result.token)}"
+    return ForgotPasswordResponse(
+        message=message,
+        reset_url=reset_url,
+        expires_at=result.expires_at if reset_url else None,
+    )
+
+
+@app.post("/api/v1/auth/reset-password", status_code=204)
+async def reset_password(request: ResetPasswordRequest):
+    await password_recovery.reset_password(
+        request.token, request.password, datetime.now(UTC)
+    )
 
 
 @app.get("/api/v1/auth/me", response_model=UserResponse)

@@ -27,6 +27,13 @@
   --color-ring: var(--ring);
   --color-mint: var(--mint);
   --color-mint-foreground: var(--mint-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-muted: var(--warning-muted);
+  --color-warning-border: var(--warning-border);
+  --color-danger-muted: var(--danger-muted);
+  --color-danger-border: var(--danger-border);
+  --color-media: #101010;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -55,6 +62,12 @@
   --border: #e6ebe8;
   --input: #dbe5e0;
   --ring: #78e3b0;
+  --warning: #d97706;
+  --warning-foreground: #92400e;
+  --warning-muted: #fffbeb;
+  --warning-border: #fcd34d;
+  --danger-muted: #fff1f2;
+  --danger-border: #fecdd3;
   font-family: var(--font-sans);
   color: var(--foreground);
   background: var(--background);
@@ -65,8 +78,8 @@
 @layer base {
   * { box-sizing: border-box; border-color: var(--border); outline-color: color-mix(in oklab, var(--ring) 50%, transparent); }
   body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--background); color: var(--foreground); }
+  button, input { font: inherit; }
 }
-button, input { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
 
 @layer base {
@@ -90,9 +103,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 }
 
 .brand-panel {
-  background:
-    linear-gradient(145deg, rgba(7, 35, 26, 0.96), rgba(8, 50, 36, 0.96)),
-    radial-gradient(circle at 80% 10%, #1f8b63, transparent 42%);
+  background: var(--primary);
 }
 
 .brand-panel::after {
@@ -106,8 +117,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 }
 
 .brand-glow { position: absolute; border-radius: 999px; filter: blur(1px); }
-.brand-glow-one { width: 430px; height: 430px; right: -160px; top: 10%; background: rgba(24, 167, 112, 0.18); }
-.brand-glow-two { width: 290px; height: 290px; left: 22%; bottom: -170px; background: rgba(78, 211, 158, 0.12); }
+.brand-glow-one { width: 430px; height: 430px; right: -160px; top: 10%; background: color-mix(in oklab, var(--mint) 12%, transparent); }
+.brand-glow-two { width: 290px; height: 290px; left: 22%; bottom: -170px; background: color-mix(in oklab, var(--mint) 8%, transparent); }
 
 .logo-mark {
   position: relative;
@@ -116,13 +127,13 @@ button, a { -webkit-tap-highlight-color: transparent; }
   height: 31px;
   align-items: center;
   justify-content: center;
-  border: 2px solid #57d7a4;
+  border: 2px solid var(--mint);
   border-radius: 9px 4px 9px 4px;
   transform: rotate(45deg);
 }
 .logo-mark span { width: 10px; height: 10px; border: 2px solid white; border-radius: 3px 1px 3px 1px; }
-.logo-mark-dark { border-color: #087a54; }
-.logo-mark-dark span { border-color: #0f172a; }
+.logo-mark-dark { border-color: var(--primary); }
+.logo-mark-dark span { border-color: var(--foreground); }
 .sidebar-logotype {
   display: block;
   width: 190px;
@@ -132,24 +143,24 @@ button, a { -webkit-tap-highlight-color: transparent; }
   background-position: center;
   background-size: contain;
 }
-.status-dot { width: 8px; height: 8px; border-radius: 999px; background: #4ade80; box-shadow: 0 0 0 5px rgba(74, 222, 128, .1); }
+.status-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--mint); box-shadow: 0 0 0 5px rgba(74, 222, 128, .1); }
 
-.field-label { display: block; margin-bottom: 0.5rem; font-size: 0.875rem; font-weight: 600; color: #334155; }
+.field-label { display: block; margin-bottom: 0.5rem; font-size: 0.875rem; font-weight: 600; color: var(--foreground); }
 .field-shell {
   display: flex;
   height: 52px;
   align-items: center;
   gap: 0.75rem;
-  border: 1px solid #dbe1e8;
+  border: 1px solid var(--input);
   border-radius: 0.75rem;
-  background: white;
+  background: var(--card);
   padding: 0 0.95rem;
-  color: #94a3b8;
+  color: var(--muted-foreground);
   transition: border-color 150ms, box-shadow 150ms;
 }
-.field-shell:focus-within { border-color: #15966a; box-shadow: 0 0 0 3px rgba(21, 150, 106, .11); color: #087a54; }
-.field-shell input { min-width: 0; flex: 1; border: 0; outline: 0; color: #0f172a; background: transparent; }
-.field-shell input::placeholder { color: #a8b1be; }
+.field-shell:focus-within { border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 25%, transparent); color: var(--primary); }
+.field-shell input { min-width: 0; flex: 1; border: 0; outline: 0; color: var(--foreground); background: transparent; }
+.field-shell input::placeholder { color: var(--muted-foreground); }
 .field-shell input:-webkit-autofill,
 .field-shell input:-webkit-autofill:hover,
 .field-shell input:-webkit-autofill:focus,
@@ -159,36 +170,30 @@ button, a { -webkit-tap-highlight-color: transparent; }
   box-shadow: 0 0 0 1000px var(--card) inset !important;
   caret-color: var(--foreground);
 }
-.field-shell.field-error { border-color: #e11d48; }
-.error-message { margin: 0.4rem 0 0; font-size: 0.78rem; color: #be123c; }
+.field-shell.field-error { border-color: var(--destructive); }
+.error-message { margin: 0.4rem 0 0; font-size: 0.78rem; color: var(--destructive); }
 
-.primary-button {
-  display: flex;
-  width: 100%;
-  height: 54px;
-  align-items: center;
-  justify-content: center;
-  gap: 0.65rem;
-  border: 0;
-  border-radius: 0.8rem;
-  background: #087a54;
-  color: white;
-  font-weight: 700;
-  box-shadow: 0 10px 24px rgba(8, 122, 84, .18);
-  cursor: pointer;
-  transition: background 150ms, transform 150ms, box-shadow 150ms;
+@layer components {
+  .ui-button, .operation-button {
+    @apply inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors outline-none;
+  }
+  .ui-button:focus-visible, .operation-button:focus-visible {
+    @apply border-ring ring-[3px] ring-ring/50;
+  }
+  .ui-button:disabled, .operation-button:disabled {
+    @apply cursor-not-allowed opacity-50;
+  }
+  .ui-button svg, .operation-button svg { @apply shrink-0 pointer-events-none; }
+  .operation-button { @apply h-9 border border-input bg-background px-4 py-2 text-foreground shadow-xs; }
+  .operation-button:hover:not(:disabled) { @apply bg-accent text-accent-foreground; }
+  .operation-button-primary { @apply border-transparent bg-primary text-primary-foreground; }
+  .operation-button-primary:hover:not(:disabled) { @apply bg-primary/90 text-primary-foreground; }
+  .operation-button-danger { @apply border-transparent bg-transparent text-destructive shadow-none; }
+  .operation-button-danger:hover:not(:disabled) { @apply bg-danger-muted text-destructive; }
+  .page-shell { @apply mx-auto w-full max-w-7xl px-5 py-8 sm:px-8; }
+  .page-heading { @apply text-3xl font-semibold tracking-tight; }
+  .page-shell > :is(header, section, div):has(.page-heading) > div:first-child { @apply min-w-0; }
 }
-.primary-button:hover { background: #066442; box-shadow: 0 12px 30px rgba(8, 122, 84, .24); transform: translateY(-1px); }
-.primary-button:focus-visible { outline: 3px solid rgba(21, 150, 106, .28); outline-offset: 3px; }
-.primary-button:disabled { cursor: wait; opacity: .7; }
-
-.operation-button { display: inline-flex; min-height: 2.25rem; align-items: center; justify-content: center; gap: .4rem; border: 1px solid var(--input); border-radius: var(--radius); background: var(--background); padding: .5rem .75rem; color: var(--foreground); font-size: .78rem; font-weight: 600; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,.04); transition: 150ms; }
-.operation-button:hover { border-color: #94a3b8; background: white; transform: translateY(-1px); }
-.operation-button:disabled { cursor: wait; opacity: .55; transform: none; }
-.operation-button-primary { border-color: var(--primary); background: var(--primary); color: var(--primary-foreground); }
-.operation-button-primary:hover { border-color: #066442; background: #066442; }
-.operation-button-danger { border-color: transparent; background: transparent; color: #be123c; }
-.operation-button-danger:hover { border-color: #fecdd3; background: #fff1f2; }
 .sidebar-link { display: flex; min-height: 40px; align-items: center; gap: .75rem; border-radius: 999px; padding: .55rem .9rem; color: var(--muted-foreground); font-size: .875rem; font-weight: 500; text-decoration: none; transition: 150ms; }
 .sidebar-link:hover { background: var(--accent); color: var(--primary); }
 .sidebar-link-active { background: var(--primary); color: var(--primary-foreground); box-shadow: 0 5px 14px rgba(40,95,85,.12); }

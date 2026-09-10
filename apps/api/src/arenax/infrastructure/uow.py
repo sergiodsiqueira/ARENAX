@@ -18,6 +18,7 @@ from .models import (
     OperationalSettingsModel,
     OutboxModel,
     PaymentModel,
+    PasswordResetTokenModel,
     PhysicalEventModel,
     SessionModel,
     SessionSpaceModel,
@@ -450,6 +451,53 @@ class SqlAlchemyUnitOfWork:
             )
         )
         return self._user_to_domain(model) if model else None
+
+    async def add_password_reset_token(
+        self, user_id: UUID, token_hash: str, now: datetime, expires_at: datetime
+    ) -> None:
+        self.session.add(
+            PasswordResetTokenModel(
+                user_id=user_id,
+                token_hash=token_hash,
+                created_at=now,
+                expires_at=expires_at,
+            )
+        )
+
+    async def get_user_by_password_reset_token(
+        self, token_hash: str, now: datetime, *, lock: bool = False
+    ) -> User | None:
+        query = (
+            select(UserModel)
+            .join(PasswordResetTokenModel, PasswordResetTokenModel.user_id == UserModel.id)
+            .where(
+                PasswordResetTokenModel.token_hash == token_hash,
+                PasswordResetTokenModel.used_at.is_(None),
+                PasswordResetTokenModel.expires_at > now,
+            )
+        )
+        model = await self.session.scalar(query.with_for_update() if lock else query)
+        return self._user_to_domain(model) if model else None
+
+    async def mark_password_reset_token_used(self, token_hash: str, now: datetime) -> None:
+        await self.session.execute(
+            update(PasswordResetTokenModel)
+            .where(
+                PasswordResetTokenModel.token_hash == token_hash,
+                PasswordResetTokenModel.used_at.is_(None),
+            )
+            .values(used_at=now)
+        )
+
+    async def revoke_password_reset_tokens(self, user_id, now) -> None:
+        await self.session.execute(
+            update(PasswordResetTokenModel)
+            .where(
+                PasswordResetTokenModel.user_id == user_id,
+                PasswordResetTokenModel.used_at.is_(None),
+            )
+            .values(used_at=now)
+        )
 
     async def add_user(
         self, name: str, email: str, password_hash: str, role: UserRole, now: datetime

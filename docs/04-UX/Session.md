@@ -15,6 +15,17 @@ Código, status, Responsável, Espaços, horário previsto/real, tempo restante,
 ```
 
 No Mission Control, detalhes rápidos podem abrir em Session Drawer sem perder contexto.
+Ao abrir o Dossiê, o retorno aponta para a tela de origem (Mission Control,
+Agenda, Financeiro ou Pagamentos pendentes). Na Agenda, preserva data, Espaço e
+visualização; no Mission Control, Status; no Financeiro, mês; em Pagamentos
+pendentes, Cliente. Os filtros ficam na URL para sobreviver também ao recarregamento.
+Links diretos sem origem informada retornam para a Agenda.
+
+Na Agenda, o card de uma Sessão Agendada apresenta Ver dossiê, Confirmar (sem
+ícone), Iniciar e Cancelar. Cancelar abre um modal com as ações Cancelar e Não
+compareceu; a segunda fica disponível somente para Sessões Agendadas ou
+Confirmadas. O modal permite sair sem alterar a Sessão e explica as consequências
+do cancelamento conforme a ADR-016.
 
 ## Pagamentos no MVP
 O operador pode registrar valor, método e observação. Cada registro
