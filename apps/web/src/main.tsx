@@ -4,6 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { LoginPage } from "./pages/LoginPage";
+import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 import { MissionControlPlaceholder } from "./pages/MissionControlPlaceholder";
 import { AccessAdministrationPage } from "./pages/AccessAdministrationPage";
 import { ClientsAdministrationPage } from "./pages/ClientsAdministrationPage";
@@ -16,6 +17,7 @@ import { HealthCenterPage } from "./pages/HealthCenterPage";
 import { FinancialDashboardPage } from "./pages/FinancialDashboardPage";
 import { PendingPaymentsPage } from "./pages/PendingPaymentsPage";
 import { Toaster } from "./components/ui/sonner";
+import { TooltipProvider } from "./components/ui/tooltip";
 import { LicenseGuard } from "./components/LicenseGuard";
 import "./styles.css";
 
@@ -24,10 +26,12 @@ const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, ref
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
     <BrowserRouter>
       <LicenseGuard>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/redefinir-senha" element={<ResetPasswordPage />} />
           <Route path="/mission-control" element={<MissionControlPlaceholder />} />
           <Route path="/agenda" element={<AgendaPage />} />
           <Route path="/sessoes/:sessionId" element={<SessionDossierPage />} />
@@ -46,6 +50,7 @@ createRoot(document.getElementById("root")!).render(
       </LicenseGuard>
       <Toaster />
     </BrowserRouter>
+    </TooltipProvider>
     </QueryClientProvider>
   </StrictMode>,
 );

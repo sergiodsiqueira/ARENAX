@@ -18,8 +18,9 @@ barreira de segurança, pois chamadas diretas à API continuariam possíveis.
 - `liberado: false` bloqueia imediatamente todas as funcionalidades operacionais.
 - Uma licença liberada pode operar sem internet até o fim do dia indicado por
   `validade`.
-- `verificarNovamente` define, em segundos, quando uma nova consulta online deve
-  ocorrer. Falhas de conexão são tentadas novamente após cinco minutos.
+- `verificarNovamenteEm` define, em segundos, quando uma nova consulta online deve
+  ocorrer. O adaptador também aceita o nome legado `verificarNovamente` quando o
+  campo atual está ausente. Falhas de conexão são tentadas novamente após cinco minutos.
 - Uma instalação que nunca conseguiu consultar o serviço recebe tolerância de dois
   dias contados da inicialização do estado local.
 - Somente saúde, autenticação, documentação técnica e consulta do próprio estado de

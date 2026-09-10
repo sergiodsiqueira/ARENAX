@@ -139,6 +139,21 @@ class LoginResponse(BaseModel):
     user: UserResponse
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+
+
+class ForgotPasswordResponse(BaseModel):
+    message: str
+    reset_url: str | None = None
+    expires_at: datetime | None = None
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(min_length=1, max_length=1024)
+    password: str = Field(min_length=12, max_length=1024)
+
+
 class CreateUserRequest(BaseModel):
     name: str = Field(min_length=1, max_length=160)
     email: str = Field(min_length=3, max_length=320)

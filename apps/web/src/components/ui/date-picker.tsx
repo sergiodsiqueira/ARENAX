@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { cn } from "../../lib/utils";
 import { Button } from "./button";
+import { MonthPicker } from "./month-picker";
 
 const weekDays = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
@@ -34,12 +35,14 @@ export function DatePicker({
   markedDates = new Set<string>(),
   className,
   triggerClassName,
+  inline = false,
 }: {
   value: string;
   onChange: (value: string) => void;
   markedDates?: ReadonlySet<string>;
   className?: string;
   triggerClassName?: string;
+  inline?: boolean;
 }) {
   const selected = useMemo(() => parseDate(value), [value]);
   const [visibleMonth, setVisibleMonth] = useState(
@@ -47,8 +50,10 @@ export function DatePicker({
   );
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
+  const displayedMonth = inline ? selected : visibleMonth;
 
   useEffect(() => {
+    if (inline) return;
     const close = (event: MouseEvent | KeyboardEvent) => {
       if (event instanceof KeyboardEvent && event.key === "Escape") setOpen(false);
       if (event instanceof MouseEvent && !root.current?.contains(event.target as Node)) setOpen(false);
@@ -59,15 +64,22 @@ export function DatePicker({
       document.removeEventListener("mousedown", close);
       document.removeEventListener("keydown", close);
     };
-  }, []);
+  }, [inline]);
 
   const moveMonth = (amount: number) => {
+    if (inline) {
+      const nextMonth = new Date(selected.getFullYear(), selected.getMonth() + amount, 1, 12);
+      const lastDay = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate();
+      nextMonth.setDate(Math.min(selected.getDate(), lastDay));
+      onChange(dateValue(nextMonth));
+      return;
+    }
     setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + amount, 1, 12));
   };
 
   return (
     <div className={cn("relative", className)} ref={root}>
-      <Button
+      {!inline && <Button
         type="button"
         variant="ghost"
         className={cn("h-10 gap-2 px-3 font-semibold text-primary", triggerClassName)}
@@ -77,24 +89,29 @@ export function DatePicker({
       >
         <CalendarDays size={18} />
         {new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "long", year: "numeric" }).format(selected)}
-      </Button>
+      </Button>}
 
-      {open && (
-        <div className="absolute top-full left-1/2 z-40 mt-2 w-[292px] -translate-x-1/2 rounded-2xl border border-border bg-card p-4 shadow-xl" role="dialog" aria-label="Escolher data">
+      {(inline || open) && (
+        <div className={inline ? "w-full" : "absolute top-full left-1/2 z-40 mt-2 w-[292px] -translate-x-1/2 rounded-2xl border border-border bg-card p-4 shadow-xl"} role={inline ? "group" : "dialog"} aria-label="Escolher data">
           <div className="mb-3 flex items-center justify-between">
             <Button type="button" variant="ghost" size="icon" className="size-8" onClick={() => moveMonth(-1)} aria-label="Mês anterior"><ChevronLeft size={17} /></Button>
-            <p className="text-sm font-semibold capitalize text-foreground">
-              {new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(visibleMonth)}
-            </p>
+            {inline ? <MonthPicker compact value={value.slice(0, 7)} onChange={(monthValue) => {
+              const nextMonth = parseDate(`${monthValue}-01`);
+              const lastDay = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate();
+              nextMonth.setDate(Math.min(selected.getDate(), lastDay));
+              onChange(dateValue(nextMonth));
+            }} /> : <p className="text-sm font-semibold capitalize text-foreground">
+              {new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(displayedMonth)}
+            </p>}
             <Button type="button" variant="ghost" size="icon" className="size-8" onClick={() => moveMonth(1)} aria-label="Próximo mês"><ChevronRight size={17} /></Button>
           </div>
 
           <div className="grid grid-cols-7" role="grid">
             {weekDays.map((label) => <span key={label} className="grid h-8 place-items-center text-[.68rem] font-medium text-muted-foreground">{label}</span>)}
-            {calendarDays(visibleMonth).map((day) => {
+            {calendarDays(displayedMonth).map((day) => {
               const itemValue = dateValue(day);
               const isSelected = itemValue === value;
-              const isOutside = day.getMonth() !== visibleMonth.getMonth();
+              const isOutside = day.getMonth() !== displayedMonth.getMonth();
               const isMarked = markedDates.has(itemValue);
               return (
                 <button
@@ -104,6 +121,7 @@ export function DatePicker({
                   aria-selected={isSelected}
                   className={cn(
                     "relative mx-auto grid size-9 place-items-center rounded-full text-xs font-medium transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    inline && "h-auto w-full max-w-9 aspect-square",
                     isOutside && "text-muted-foreground/55",
                     isSelected && "bg-mint text-mint-foreground hover:bg-mint",
                   )}

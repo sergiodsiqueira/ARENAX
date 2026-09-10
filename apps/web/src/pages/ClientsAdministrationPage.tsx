@@ -1,3 +1,4 @@
+import { FormModal } from "../components/ui/form-modal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { faWhatsapp } from "@fortawesome/free-brands-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -12,9 +13,9 @@ import { Combobox } from "../components/ui/combobox";
 import { Checkbox } from "../components/ui/checkbox";
 import { Input } from "../components/ui/input";
 import { ModalCloseButton } from "../components/ui/modal-close-button";
-import { useModalEscape } from "../hooks/use-modal-escape";
 import { SearchInput } from "../components/ui/search-input";
 import { Textarea } from "../components/ui/textarea";
+import { Hint } from "../components/ui/tooltip";
 import {
   createClient,
   deleteClient,
@@ -67,7 +68,6 @@ export function ClientsAdministrationPage() {
     [email, setEmail] = useState(""),
     [whatsapp, setWhatsapp] = useState(false),
     [status, setStatus] = useState<Client["administrative_status"]>("active");
-  useModalEscape(Boolean(modal), () => setModal(null));
   const user = useQuery({
       queryKey: ["current-user"],
       queryFn: getCurrentUser,
@@ -166,11 +166,11 @@ export function ClientsAdministrationPage() {
   const postalCodeValid = !postalCode || postalCode.replace(/\D/g, "").length === 8;
   return (
     <AppShell user={user.data}>
-      <main className="mx-auto max-w-7xl px-5 py-8 sm:px-8">
-        <header className="flex items-end justify-between gap-4">
+      <main className="page-shell">
+        <header className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
           <div>
-            <p className="text-sm font-semibold text-emerald-700">CLIENTES</p>
-            <h1 className="mt-2 text-3xl font-semibold">
+            <p className="text-sm font-semibold text-primary">CLIENTES</p>
+            <h1 className="mt-2 page-heading">
               Cadastro de Clientes
             </h1>
           </div>
@@ -205,8 +205,8 @@ export function ClientsAdministrationPage() {
           />
         </div>
         <SearchInput className="mt-6" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Pesquisar Clientes" aria-label="Pesquisar Clientes" />
-        <section className="mt-4 overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="grid min-w-[840px] border-b bg-slate-50 px-4 py-3 text-xs font-semibold uppercase text-slate-500" style={{ gridTemplateColumns: "64px 300px 170px minmax(220px, 1fr) 100px" }}>
+        <section className="mt-4 overflow-x-auto rounded-2xl border border-border bg-card shadow-sm">
+          <div className="grid min-w-[840px] border-b bg-muted px-4 py-3 text-xs font-semibold uppercase text-muted-foreground" style={{ gridTemplateColumns: "64px 300px 170px minmax(220px, 1fr) 100px" }}>
             <span>Tipo</span>
             <span>Nome</span>
             <span>Telefone</span>
@@ -219,26 +219,27 @@ export function ClientsAdministrationPage() {
               className="grid min-w-[840px] items-center border-b px-4 py-4 last:border-0"
               style={{ gridTemplateColumns: "64px 300px 170px minmax(220px, 1fr) 100px" }}
             >
-              <span
-                className="text-emerald-700"
-                title={item.client_type === "F" ? "Pessoa Física" : "Pessoa Jurídica"}
-                aria-label={item.client_type === "F" ? "Pessoa Física" : "Pessoa Jurídica"}
-              >
-                {item.client_type === "F" ? <User size={21} /> : <Building2 size={21} />}
-              </span>
+              <Hint label={item.client_type === "F" ? "Pessoa Física" : "Pessoa Jurídica"}>
+                <span
+                  className="w-fit text-primary"
+                  aria-label={item.client_type === "F" ? "Pessoa Física" : "Pessoa Jurídica"}
+                >
+                  {item.client_type === "F" ? <User size={21} /> : <Building2 size={21} />}
+                </span>
+              </Hint>
               <div>
                 <p className="font-semibold">{item.name}</p>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-muted-foreground">
                   {item.administrative_status === "active"
                     ? "Ativo"
                     : "Inativo"}
                 </p>
               </div>
-              <span className="flex items-center gap-2 text-sm text-slate-600">{item.phone ? formatPhone(item.phone) : "Não informado"}{item.whatsapp && item.phone ? <FontAwesomeIcon className="text-base text-emerald-700" icon={faWhatsapp} title="WhatsApp" aria-label="WhatsApp" /> : null}</span>
-              <span className="truncate pr-4 text-sm text-slate-600">{item.email || "Não informado"}</span>
+              <span className="flex items-center gap-2 text-sm text-foreground">{item.phone ? formatPhone(item.phone) : "Não informado"}{item.whatsapp && item.phone ? <Hint label="WhatsApp"><span className="inline-flex text-primary" aria-label="WhatsApp"><FontAwesomeIcon className="text-base" icon={faWhatsapp} /></span></Hint> : null}</span>
+              <span className="truncate pr-4 text-sm text-foreground">{item.email || "Não informado"}</span>
               <div className="flex gap-1">
                 <button
-                  className="rounded-lg p-2 hover:bg-slate-100"
+                  className="rounded-lg p-2 hover:bg-muted"
                   onClick={() => open(item)}
                   aria-label="Editar"
                 >
@@ -250,21 +251,21 @@ export function ClientsAdministrationPage() {
                   confirmLabel="Excluir Cliente"
                   pending={remove.isPending}
                   onConfirm={() => remove.mutate(item.id)}
-                  trigger={<button className="rounded-lg p-2 hover:bg-rose-50 hover:text-rose-700" aria-label={`Excluir ${item.name}`}><Trash2 size={17} /></button>}
+                  trigger={<button className="rounded-lg p-2 hover:bg-danger-muted hover:text-destructive" aria-label={`Excluir ${item.name}`}><Trash2 size={17} /></button>}
                 />
               </div>
             </div>
           ))}
           {!rows.length && (
-            <p className="p-10 text-center text-slate-500">
+            <p className="p-10 text-center text-muted-foreground">
               Nenhum Cliente nesta seleção.
             </p>
           )}
         </section>
         {modal && (
-          <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 px-5">
+          <FormModal title="Cliente" onClose={() => setModal(null)} size="md">
             <form
-              className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"
+              className="w-full p-6"
               onSubmit={(e: FormEvent) => {
                 e.preventDefault();
                 save.mutate();
@@ -366,7 +367,7 @@ export function ClientsAdministrationPage() {
                 </button>
               </div>
             </form>
-          </div>
+          </FormModal>
         )}
       </main>
     </AppShell>

@@ -1,3 +1,4 @@
+import { FormModal } from "../components/ui/form-modal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { MapPin, Pencil, Plus, Trash2 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
@@ -9,7 +10,6 @@ import { ConfirmationAlertDialog } from "../components/ui/confirmation-alert-dia
 import { Checkbox } from "../components/ui/checkbox";
 import { Input } from "../components/ui/input";
 import { ModalCloseButton } from "../components/ui/modal-close-button";
-import { useModalEscape } from "../hooks/use-modal-escape";
 import { SearchInput } from "../components/ui/search-input";
 import {
   createSpace,
@@ -30,7 +30,6 @@ export function SpacesAdministrationPage() {
     [name, setName] = useState(""),
     [minuteRate, setMinuteRate] = useState(""),
     [status, setStatus] = useState("active");
-  useModalEscape(Boolean(modal), () => setModal(null));
   const user = useQuery({
       queryKey: ["current-user"],
       queryFn: getCurrentUser,
@@ -90,11 +89,11 @@ export function SpacesAdministrationPage() {
   };
   return (
     <AppShell user={user.data}>
-      <main className="mx-auto max-w-7xl px-5 py-8 sm:px-8">
+      <main className="page-shell">
         <header className="flex items-end justify-between">
           <div>
-            <p className="text-sm font-semibold text-emerald-700">ESPAÇOS</p>
-            <h1 className="mt-2 text-3xl font-semibold">Cadastro de Espaços</h1>
+            <p className="text-sm font-semibold text-primary">ESPAÇOS</p>
+            <h1 className="mt-2 page-heading">Cadastro de Espaços</h1>
           </div>
           <button
             className="operation-button operation-button-primary"
@@ -127,8 +126,8 @@ export function SpacesAdministrationPage() {
           />
         </div>
         <SearchInput className="mt-6" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Pesquisar Espaços" aria-label="Pesquisar Espaços" />
-        <section className="mt-4 overflow-hidden rounded-2xl border bg-white shadow-sm">
-          <div className="grid grid-cols-[80px_1fr_110px] border-b bg-slate-50 px-4 py-3 text-xs font-semibold uppercase text-slate-500">
+        <section className="mt-4 overflow-hidden rounded-2xl border bg-card shadow-sm">
+          <div className="grid grid-cols-[80px_1fr_110px] border-b bg-muted px-4 py-3 text-xs font-semibold uppercase text-muted-foreground">
             <span>Tipo</span>
             <span>Descrição</span>
             <span>Ações</span>
@@ -138,11 +137,11 @@ export function SpacesAdministrationPage() {
               key={x.id}
               className="grid grid-cols-[80px_1fr_110px] items-center border-b px-4 py-4 last:border-0"
             >
-              <MapPin className="text-emerald-700" />
+              <MapPin className="text-primary" />
               <div>
                 <p className="font-semibold">{x.name}</p>
-                <p className="text-sm text-slate-600">{formatCurrency(x.minute_rate_cents)} por minuto</p>
-                <p className="text-xs text-slate-400">
+                <p className="text-sm text-foreground">{formatCurrency(x.minute_rate_cents)} por minuto</p>
+                <p className="text-xs text-muted-foreground">
                   {x.administrative_status === "active"
                     ? "Ativo"
                     : x.administrative_status === "maintenance"
@@ -152,7 +151,7 @@ export function SpacesAdministrationPage() {
               </div>
               <div className="flex gap-1">
                 <button
-                  className="rounded-lg p-2 hover:bg-slate-100"
+                  className="rounded-lg p-2 hover:bg-muted"
                   onClick={() => open(x)}
                 >
                   <Pencil size={17} />
@@ -163,21 +162,21 @@ export function SpacesAdministrationPage() {
                   confirmLabel="Excluir Espaço"
                   pending={remove.isPending}
                   onConfirm={() => remove.mutate(x.id)}
-                  trigger={<button className="rounded-lg p-2 hover:bg-rose-50 hover:text-rose-700" aria-label={`Excluir ${x.name}`}><Trash2 size={17} /></button>}
+                  trigger={<button className="rounded-lg p-2 hover:bg-danger-muted hover:text-destructive" aria-label={`Excluir ${x.name}`}><Trash2 size={17} /></button>}
                 />
               </div>
             </div>
           ))}
           {!rows.length && (
-            <p className="p-10 text-center text-slate-500">
+            <p className="p-10 text-center text-muted-foreground">
               Nenhum Espaço nesta seleção.
             </p>
           )}
         </section>
         {modal && (
-          <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 px-5">
+          <FormModal title="Espaço" onClose={() => setModal(null)} size="sm">
             <form
-              className="w-full max-w-md rounded-2xl bg-white p-6"
+              className="w-full p-6"
               onSubmit={(e: FormEvent) => {
                 e.preventDefault();
                 save.mutate();
@@ -226,7 +225,7 @@ export function SpacesAdministrationPage() {
                 </button>
               </div>
             </form>
-          </div>
+          </FormModal>
         )}
       </main>
     </AppShell>

@@ -1,9 +1,12 @@
+import json
 from datetime import UTC, date, datetime, timedelta
+from io import BytesIO
 
 import pytest
 
 from arenax.application.license import LicenseCheckUnavailable, LicenseService
 from arenax.domain.license import LicenseState, decide_license
+from arenax.infrastructure.license import LicenseGateway
 
 NOW = datetime(2026, 9, 2, 15, tzinfo=UTC)
 
@@ -122,3 +125,41 @@ async def test_offline_failure_keeps_initial_grace_and_schedules_retry():
     assert decision.allowed
     assert repository.failure[1] == NOW + timedelta(minutes=5)
     assert decision.check_status == "unavailable"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("interval_field", ["verificarNovamenteEm", "verificarNovamente"])
+@pytest.mark.parametrize("allowed", [True, False])
+async def test_provider_response_controls_access_after_initial_grace(monkeypatch, interval_field, allowed):
+    payload = {
+        "liberado": allowed,
+        "cnpj": "24047133000181",
+        "cliente": "Willian Latanzi Salino",
+        "validade": "2026-09-30",
+        interval_field: 172800,
+    }
+    calls = []
+
+    def urlopen(request, timeout):
+        assert request.get_header("User-agent") == "ARENAX/0.1"
+        assert request.get_header("Accept") == "application/json"
+        calls.append(request.full_url)
+        return BytesIO(json.dumps(payload).encode("utf-8"))
+
+    monkeypatch.setattr("arenax.infrastructure.license.urlopen", urlopen)
+    repository = Repository(
+        state(installation_started_at=NOW - timedelta(days=3)), payload["cnpj"]
+    )
+    service = LicenseService(repository, LicenseGateway("https://license.example/api/v1/licencas"))
+
+    decision = await service.status(NOW)
+
+    assert decision.allowed is allowed
+    assert decision.reason == ("license_active" if allowed else "license_blocked")
+    assert decision.valid_until == date(2026, 9, 30)
+    assert decision.customer_name == payload["cliente"]
+    assert decision.check_status == "consulted"
+    assert decision.next_check_at == NOW + timedelta(seconds=172800)
+    assert repository.failure is None
+    assert await service.status(NOW + timedelta(hours=1)) == decision
+    assert calls == ["https://license.example/api/v1/licencas/24047133000181"]

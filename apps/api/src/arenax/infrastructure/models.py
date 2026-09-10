@@ -308,3 +308,15 @@ class AccessModel(Base):
     expires_at: Mapped[datetime] = mapped_column("expira_em", DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column("revogado_em", DateTime(timezone=True))
     persistent: Mapped[bool] = mapped_column("persistente", Boolean, default=False)
+
+
+class PasswordResetTokenModel(Base):
+    __tablename__ = "tokens_redefinicao_senha"
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        "usuario_id", ForeignKey("usuarios.id"), index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column("criado_em", DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column("expira_em", DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column("usado_em", DateTime(timezone=True))

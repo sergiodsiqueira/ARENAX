@@ -31,8 +31,12 @@ misturar credenciais e permissões ao contexto de Clientes.
   outro papel.
 - Alteração de senha, bloqueio e desativação revogam todos os Acessos ativos do
   Usuário afetado.
+- Recuperação local de senha usa token opaco temporário, de uso único, persistido
+  somente como hash em `tokens_redefinicao_senha`. No MVP local, a API pode expor
+  a URL de redefinição para teste; em produção, a mesma intenção deve enviar as
+  instruções por e-mail sem revelar se o Usuário existe.
 
 ## Consequências
 Regras de autorização permanecem no backend. Tokens não são armazenados em
-`localStorage`. Recuperação de senha, MFA e vínculo opcional com Cliente são evoluções
-posteriores e não alteram o significado de Sessão no Core Domain.
+`localStorage`. MFA e vínculo opcional com Cliente são evoluções posteriores e
+não alteram o significado de Sessão no Core Domain.

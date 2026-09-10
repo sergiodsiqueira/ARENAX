@@ -1,3 +1,4 @@
+import { FormModal } from "../components/ui/form-modal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { faWhatsapp } from "@fortawesome/free-brands-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -29,7 +30,7 @@ import { AppShell } from "../components/AppShell";
 import { Combobox } from "../components/ui/combobox";
 import { Input } from "../components/ui/input";
 import { ModalCloseButton } from "../components/ui/modal-close-button";
-import { useModalEscape } from "../hooks/use-modal-escape";
+import { Hint } from "../components/ui/tooltip";
 import {
   changeExpectedAmount,
   getClients,
@@ -97,16 +98,40 @@ export function SessionDossierPage() {
   const { sessionId = "" } = useParams();
   const [searchParams] = useSearchParams();
   const agendaDate = searchParams.get("agendaDate");
+  const missionControlStatus = searchParams.get("status");
+  const missionControlHref = missionControlStatus
+    ? `/mission-control?status=${encodeURIComponent(missionControlStatus)}`
+    : "/mission-control";
   const agendaHref = agendaDate && /^\d{4}-\d{2}-\d{2}$/.test(agendaDate)
     ? `/agenda?date=${encodeURIComponent(agendaDate)}`
     : "/agenda";
+  const returnDestinations: Record<string, { href: string; label: string }> = {
+    "mission-control": { href: missionControlHref, label: "Mission Control" },
+    financeiro: { href: "/administracao/financeiro", label: "Financeiro" },
+    pendencias: { href: "/administracao/financeiro/pendencias", label: "Pagamentos pendentes" },
+  };
+  const origin = searchParams.get("from") ?? "";
+  let returnDestination = Object.hasOwn(returnDestinations, origin)
+    ? returnDestinations[origin] : { href: agendaHref, label: "Agenda" };
+  const requestedReturn = searchParams.get("returnTo");
+  const allowedReturnPaths: Record<string, string> = {
+    "/agenda": "Agenda",
+    "/mission-control": "Mission Control",
+    "/administracao/financeiro": "Financeiro",
+    "/administracao/financeiro/pendencias": "Pagamentos pendentes",
+  };
+  if (requestedReturn) {
+    const pathname = requestedReturn.split("?")[0];
+    if (Object.hasOwn(allowedReturnPaths, pathname)) {
+      returnDestination = { href: requestedReturn, label: allowedReturnPaths[pathname] };
+    }
+  }
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [amount, setAmount] = useState<string | null>(null);
   const [method, setMethod] = useState<PaymentMethod>("pix");
   const [note, setNote] = useState("");
   const [priceModalOpen, setPriceModalOpen] = useState(false);
-  useModalEscape(priceModalOpen, () => setPriceModalOpen(false));
   const [expectedAmountInput, setExpectedAmountInput] = useState("");
   const user = useQuery({
     queryKey: ["current-user"],
@@ -255,19 +280,19 @@ export function SessionDossierPage() {
   if (dossier.isLoading || user.isLoading)
     return (
       <AppShell user={user.data}>
-        <main className="mx-auto max-w-7xl px-5 py-10 sm:px-8">
-          <div className="h-56 animate-pulse rounded-2xl border border-slate-200 bg-white" />
+        <main className="page-shell">
+          <div className="h-56 animate-pulse rounded-2xl border border-border bg-card" />
         </main>
       </AppShell>
     );
   if (dossier.isError || !dossier.data)
     return (
       <AppShell user={user.data}>
-        <main className="mx-auto max-w-7xl px-5 py-10 sm:px-8">
-          <Link className="operation-button" to={agendaHref}>
-            <ArrowLeft size={16} /> Agenda
+        <main className="page-shell">
+          <Link className="operation-button" to={returnDestination.href}>
+            <ArrowLeft size={16} /> Voltar para {returnDestination.label}
           </Link>
-          <div className="mt-6 rounded-2xl border border-rose-200 bg-white p-8 text-rose-800">
+          <div className="mt-6 rounded-2xl border border-danger-border bg-card p-8 text-destructive">
             Não foi possível carregar o Dossiê da Sessão.
           </div>
         </main>
@@ -278,23 +303,23 @@ export function SessionDossierPage() {
   const sessionPayments = session.payments ?? [];
   return (
     <AppShell user={user.data}>
-      <main className="mx-auto max-w-7xl px-5 py-7 sm:px-8 sm:py-10">
+      <main className="page-shell">
       <Link
-        className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-700"
-        to={agendaHref}
+        className="inline-flex items-center gap-2 text-sm font-semibold text-primary"
+        to={returnDestination.href}
         >
-          <ArrowLeft size={16} /> Voltar para Agenda
+          <ArrowLeft size={16} /> Voltar para {returnDestination.label}
         </Link>
-        <header className="mt-5 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+        <header className="mt-5 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
           <div>
-            <p className="text-sm font-semibold tracking-wide text-emerald-700">
+            <p className="text-sm font-semibold tracking-wide text-primary">
               DOSSIÊ DA SESSÃO
             </p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+            <h1 className="mt-2 page-heading">
               Sessão #{session.id.slice(0, 8).toUpperCase()}
             </h1>
           </div>
-          <span className="w-fit rounded-full bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white">
+          <span className="w-fit rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold text-primary">
             {statusLabels[session.status]}
           </span>
         </header>
@@ -303,7 +328,7 @@ export function SessionDossierPage() {
             icon={<UserRound size={19} />}
             label="Responsável"
             value={responsibleClient?.name ?? "Cliente desconhecido"}
-            detail={<span className="inline-flex items-center gap-2">{responsibleClient?.phone ? formatPhone(responsibleClient.phone) : "Telefone não informado"}{responsibleClient?.whatsapp && responsibleClient.phone ? <FontAwesomeIcon className="text-base text-emerald-700" icon={faWhatsapp} title="WhatsApp" aria-label="WhatsApp" /> : null}</span>}
+            detail={<span className="inline-flex items-center gap-2">{responsibleClient?.phone ? formatPhone(responsibleClient.phone) : "Telefone não informado"}{responsibleClient?.whatsapp && responsibleClient.phone ? <Hint label="WhatsApp"><span className="inline-flex text-primary" aria-label="WhatsApp"><FontAwesomeIcon className="text-base" icon={faWhatsapp} /></span></Hint> : null}</span>}
           />
           <Info
             icon={<MapPin size={19} />}
@@ -323,82 +348,84 @@ export function SessionDossierPage() {
             value={`${dateTime(session.actual_start)} — ${dateTime(session.actual_end)}`}
           />
         </section>
-        <section className="mt-7 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <section className="mt-7 rounded-2xl border border-border bg-card p-5 shadow-sm">
           <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
             <div className="flex items-start gap-2">
-              <DollarSign className="mt-0.5 shrink-0 text-emerald-700" size={21} />
+              <DollarSign className="mt-0.5 shrink-0 text-primary" size={21} />
               <div>
                 <h2 className="text-xl font-semibold">Pagamentos</h2>
                 <div className="mt-1 flex flex-wrap items-center">
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-muted-foreground">
                     Previsto:{" "}
-                    <strong className="text-slate-800">
+                    <strong className="text-foreground">
                       {currency(session.expected_amount_cents ?? 0)}
                     </strong>
                     {session.expected_amount_is_manual ? (
-                      <span className="ml-1 text-xs text-amber-700">
+                      <span className="ml-1 text-xs text-warning-foreground">
                         (manual)
                       </span>
                     ) : null}{" "}
                     · Pago:{" "}
-                    <strong className="text-slate-800">
+                    <strong className="text-foreground">
                       {currency(paidAmountCents)}
                     </strong>{" "}
                     · Saldo:{" "}
                     <strong
                       className={
                         remainingAmountCents > 0
-                          ? "text-rose-700"
-                          : "text-slate-800"
+                          ? "text-destructive"
+                          : "text-foreground"
                       }
                     >
                       {currency(remainingAmountCents)}
                     </strong>
                   </p>
                   <div className="ml-[30px] flex items-center gap-[10px]">
-                    <button
-                      className="rounded-lg p-1.5 text-slate-500 hover:bg-emerald-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
-                      type="button"
-                      title="Alterar valor previsto"
-                      aria-label="Alterar valor previsto"
-                      onClick={() => {
-                        setExpectedAmountInput(
-                          ((session.expected_amount_cents ?? 0) / 100)
-                            .toFixed(2)
-                            .replace(".", ","),
-                        );
-                        setPriceModalOpen(true);
-                      }}
-                    >
-                      <Pencil size={17} />
-                    </button>
-                    <button
-                      className="rounded-lg p-1.5 text-slate-500 hover:bg-emerald-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
-                      type="button"
-                        title="Recalcular com o valor histórico da Sessão"
-                      aria-label="Recalcular valor previsto"
-                      disabled={recalculate.isPending}
-                      onClick={() => recalculate.mutate()}
-                    >
-                      <RefreshCw
-                        className={recalculate.isPending ? "animate-spin" : ""}
-                        size={17}
-                      />
-                    </button>
+                    <Hint label="Alterar valor previsto">
+                      <button
+                        className="rounded-lg p-1.5 text-muted-foreground hover:bg-secondary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        type="button"
+                        aria-label="Alterar valor previsto"
+                        onClick={() => {
+                          setExpectedAmountInput(
+                            ((session.expected_amount_cents ?? 0) / 100)
+                              .toFixed(2)
+                              .replace(".", ","),
+                          );
+                          setPriceModalOpen(true);
+                        }}
+                      >
+                        <Pencil size={17} />
+                      </button>
+                    </Hint>
+                    <Hint label="Recalcular com o valor histórico da Sessão">
+                      <button
+                        className="rounded-lg p-1.5 text-muted-foreground hover:bg-secondary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        type="button"
+                        aria-label="Recalcular valor previsto"
+                        disabled={recalculate.isPending}
+                        onClick={() => recalculate.mutate()}
+                      >
+                        <RefreshCw
+                          className={recalculate.isPending ? "animate-spin" : ""}
+                          size={17}
+                        />
+                      </button>
+                    </Hint>
                   </div>
                 </div>
               </div>
             </div>
-            <span className="w-fit rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">
+            <span className="w-fit rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-primary">
               {sessionPayments.length} registro
               {sessionPayments.length !== 1 ? "s" : ""}
             </span>
           </div>
           <form
-            className="mt-5 grid gap-3 border-t border-slate-100 pt-5 md:grid-cols-[.7fr_1fr_1.5fr_auto] md:items-end"
+            className="mt-5 grid gap-3 border-t border-border pt-5 md:grid-cols-[.7fr_1fr_1.5fr_auto] md:items-end"
             onSubmit={submitPayment}
           >
-            <label className="text-sm font-medium text-slate-700">
+            <label className="text-sm font-medium text-foreground">
               Valor (R$)
               <Input
                 className="mt-2"
@@ -409,7 +436,7 @@ export function SessionDossierPage() {
                 required
               />
             </label>
-            <label className="text-sm font-medium text-slate-700">
+            <label className="text-sm font-medium text-foreground">
               Método
               <Combobox
                 className="mt-2"
@@ -421,7 +448,7 @@ export function SessionDossierPage() {
                 searchPlaceholder="Buscar método..."
               />
             </label>
-            <label className="text-sm font-medium text-slate-700">
+            <label className="text-sm font-medium text-foreground">
               Observação (opcional)
               <Input
                 className="mt-2"
@@ -440,18 +467,18 @@ export function SessionDossierPage() {
             </button>
           </form>
           {!sessionPayments.length ? (
-            <p className="mt-5 rounded-xl bg-slate-50 p-4 text-sm text-slate-500">
+            <p className="mt-5 rounded-xl bg-muted p-4 text-sm text-muted-foreground">
               Nenhum Pagamento registrado nesta Sessão.
             </p>
           ) : (
-            <div className="mt-5 divide-y divide-slate-100">
+            <div className="mt-5 divide-y divide-border">
               {sessionPayments.map((item) => (
                 <article
                   className="flex flex-col justify-between gap-2 py-3 sm:flex-row sm:items-center"
                   key={item.id}
                 >
                   <div className="flex items-start gap-3">
-                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-700">
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-secondary text-primary">
                       <ReceiptText size={18} />
                     </span>
                     <div>
@@ -459,7 +486,7 @@ export function SessionDossierPage() {
                         {currency(item.amount_cents)} ·{" "}
                         {paymentLabels[item.method]}
                       </p>
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-muted-foreground">
                         {dateTime(item.registered_at)}
                         {item.note ? ` · ${item.note}` : ""}
                       </p>
@@ -471,16 +498,16 @@ export function SessionDossierPage() {
           )}
         </section>
         {priceModalOpen && (
-          <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 px-5">
+          <FormModal title="Alterar valor previsto" onClose={() => setPriceModalOpen(false)} size="sm">
             <form
-              className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+              className="w-full p-6"
               onSubmit={(event) => {
                 event.preventDefault();
                 expectedAmount.mutate();
               }}
             >
               <div className="flex items-start justify-between gap-4"><h2 className="text-xl font-semibold">Alterar valor previsto</h2><ModalCloseButton onClick={() => setPriceModalOpen(false)} /></div>
-              <p className="mt-2 text-sm text-slate-500">
+              <p className="mt-2 text-sm text-muted-foreground">
                 Este valor substituirá o cálculo automático desta Sessão até que
                 ele seja recalculado.
               </p>
@@ -515,19 +542,19 @@ export function SessionDossierPage() {
                 </button>
               </div>
             </form>
-          </div>
+          </FormModal>
         )}
         <div className="mt-7 grid gap-6 xl:grid-cols-[1.35fr_.65fr]">
           <section>
             <div className="flex items-center gap-2">
-              <Film className="text-emerald-700" size={21} />
+              <Film className="text-primary" size={21} />
               <h2 className="text-xl font-semibold">Momentos e Replays</h2>
-              <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-500">
+              <span className="rounded-full bg-muted px-2 py-1 text-xs text-muted-foreground">
                 {session.moments.length}
               </span>
             </div>
             {!session.moments.length && (
-              <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500">
+              <div className="mt-4 rounded-2xl border border-dashed border-border bg-card p-10 text-center text-muted-foreground">
                 Nenhum Momento registrado nesta Sessão.
               </div>
             )}
@@ -535,17 +562,17 @@ export function SessionDossierPage() {
               {session.moments.map((moment) => (
                 <article
                   key={moment.id}
-                  className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+                  className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
                 >
                   {moment.status === "ready" ? (
                     <video
-                      className="aspect-video w-full bg-black"
+                      className="aspect-video w-full bg-media"
                       src={replayUrl(moment.id)}
                       controls
                       preload="metadata"
                     />
                   ) : (
-                    <div className="grid aspect-video place-items-center bg-slate-950 text-slate-300">
+                    <div className="grid aspect-video place-items-center bg-foreground text-muted-foreground">
                       <div className="text-center">
                         <CirclePlay className="mx-auto" size={32} />
                         <p className="mt-2 text-sm">
@@ -567,11 +594,11 @@ export function SessionDossierPage() {
                         second: "2-digit",
                       }).format(new Date(moment.occurred_at))}
                     </p>
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       {spaceNames.get(moment.space_id) ?? "Espaço desconhecido"}{" "}
                       · {moment.status}
                     </p>
-                    {moment.status === "ready" && <div className="mt-4 flex gap-2 border-t border-slate-100 pt-4">
+                    {moment.status === "ready" && <div className="mt-4 flex gap-2 border-t border-border pt-4">
                       <a className="operation-button" href={replayUrl(moment.id)} download><Download size={16} /> Baixar</a>
                       <button className="operation-button operation-button-primary" type="button" onClick={() => shareReplay(moment.id)}><Share2 size={16} /> Compartilhar</button>
                     </div>}
@@ -582,9 +609,9 @@ export function SessionDossierPage() {
           </section>
           <section>
             <h2 className="text-xl font-semibold">Timeline</h2>
-            <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mt-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
               {!session.timeline.length && (
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-muted-foreground">
                   Nenhum evento registrado.
                 </p>
               )}
@@ -592,14 +619,14 @@ export function SessionDossierPage() {
                 {session.timeline.map((entry, index) => (
                   <li
                     key={`${entry.kind}-${entry.occurred_at}-${index}`}
-                    className="relative flex gap-3 before:absolute before:left-[5px] before:top-5 before:h-[calc(100%+4px)] before:w-px before:bg-slate-200 last:before:hidden"
+                    className="relative flex gap-3 before:absolute before:left-[5px] before:top-5 before:h-[calc(100%+4px)] before:w-px before:bg-border last:before:hidden"
                   >
-                    <span className="relative mt-1 h-3 w-3 shrink-0 rounded-full bg-emerald-600 ring-4 ring-emerald-50" />
+                    <span className="relative mt-1 h-3 w-3 shrink-0 rounded-full bg-primary ring-4 ring-ring" />
                     <div>
                       <p className="text-sm font-semibold">
                         {eventLabels[entry.kind] ?? entry.kind}
                       </p>
-                      <time className="mt-1 block text-xs text-slate-400">
+                      <time className="mt-1 block text-xs text-muted-foreground">
                         {dateTime(entry.occurred_at)}
                       </time>
                     </div>
@@ -637,17 +664,17 @@ function Info({
   detail?: ReactNode;
 }) {
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-center gap-2 text-emerald-700">
+    <article className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+      <div className="flex items-center gap-2 text-primary">
         {icon}
         <span className="text-xs font-semibold uppercase tracking-wide">
           {label}
         </span>
       </div>
-      <p className="mt-3 text-sm font-semibold leading-relaxed text-slate-800">
+      <p className="mt-3 text-sm font-semibold leading-relaxed text-foreground">
         {value}
       </p>
-      {detail && <p className="mt-1 text-xs text-slate-500">{detail}</p>}
+      {detail && <p className="mt-1 text-xs text-muted-foreground">{detail}</p>}
     </article>
   );
 }

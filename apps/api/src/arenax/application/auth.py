@@ -13,6 +13,12 @@ class LoginResult:
     persistent: bool
 
 
+@dataclass(frozen=True, slots=True)
+class PasswordResetRequestResult:
+    token: str | None
+    expires_at: datetime | None
+
+
 class AuthenticationService:
     def __init__(self, uow_factory, password_hasher, token_issuer, token_hasher):
         self._uow_factory = uow_factory
@@ -60,6 +66,48 @@ class AuthenticationService:
             return
         async with self._uow_factory() as uow:
             await uow.revoke_access(self._token_hasher(token), now)
+            await uow.commit()
+
+
+class PasswordRecoveryService:
+    def __init__(self, uow_factory, password_hasher, token_issuer, token_hasher):
+        self._uow_factory = uow_factory
+        self._password_hasher = password_hasher
+        self._token_issuer = token_issuer
+        self._token_hasher = token_hasher
+
+    @staticmethod
+    def _validate_password(password: str) -> None:
+        if len(password) < 12:
+            raise ValueError("A senha deve possuir ao menos 12 caracteres")
+
+    async def request_reset(
+        self, email: str, now: datetime, duration: timedelta
+    ) -> PasswordResetRequestResult:
+        normalized_email = email.strip().casefold()
+        async with self._uow_factory() as uow:
+            user = await uow.get_user_by_email(normalized_email)
+            if not user or user.status is not UserStatus.ACTIVE:
+                return PasswordResetRequestResult(None, None)
+            token = self._token_issuer()
+            expires_at = now + duration
+            await uow.add_password_reset_token(
+                user.id, self._token_hasher(token), now, expires_at
+            )
+            await uow.commit()
+            return PasswordResetRequestResult(token, expires_at)
+
+    async def reset_password(self, token: str, password: str, now: datetime) -> None:
+        self._validate_password(password)
+        async with self._uow_factory() as uow:
+            token_hash = self._token_hasher(token)
+            user = await uow.get_user_by_password_reset_token(token_hash, now, lock=True)
+            if not user or user.status is not UserStatus.ACTIVE:
+                raise InvalidCredentials("Solicitação de redefinição inválida ou expirada")
+            await uow.update_user_password(user.id, self._password_hasher.hash(password), now)
+            await uow.mark_password_reset_token_used(token_hash, now)
+            await uow.revoke_password_reset_tokens(user.id, now)
+            await uow.revoke_user_accesses(user.id, now)
             await uow.commit()
 
 

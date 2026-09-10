@@ -3,6 +3,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { logout, type AuthenticatedUser } from "../lib/api";
+import { Hint } from "./ui/tooltip";
 
 type AppShellProps = { user: AuthenticatedUser | undefined; children: ReactNode };
 
@@ -43,19 +44,21 @@ export function AppShell({ user, children }: AppShellProps) {
     <div className="shrink-0 border-t border-border p-3">
       <div className="flex items-center justify-between gap-3 px-3 py-2">
         <div className="min-w-0"><p className="truncate text-sm font-semibold text-foreground">{user?.name ?? "Carregando..."}</p><p className="mt-1 text-xs capitalize text-muted-foreground">{user?.role}</p></div>
-        <button type="button" className="grid size-9 shrink-0 cursor-pointer place-items-center rounded-lg text-muted-foreground hover:bg-rose-50 hover:text-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" onClick={leave} aria-label="Fechar aplicação" title="Fechar aplicação"><Power size={19} /></button>
+        <Hint label="Fechar aplicação" side="top">
+          <button type="button" className="grid size-9 shrink-0 cursor-pointer place-items-center rounded-lg text-muted-foreground hover:bg-danger-muted hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" onClick={leave} aria-label="Fechar aplicação"><Power size={19} /></button>
+        </Hint>
       </div>
     </div>
   </>;
 
   return <div className="min-h-screen bg-background text-foreground">
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-66 flex-col border-r border-border bg-card lg:flex">{sidebar}</aside>
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white/95 px-5 backdrop-blur lg:hidden">
-      <button className="rounded-lg p-2 text-slate-600 hover:bg-slate-100" onClick={() => setOpen(true)} aria-label="Abrir menu" aria-expanded={open}><Menu size={22} /></button>
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-card/95 px-5 backdrop-blur lg:hidden">
+      <button className="rounded-lg p-2 text-foreground hover:bg-muted" onClick={() => setOpen(true)} aria-label="Abrir menu" aria-expanded={open}><Menu size={22} /></button>
       <img className="h-12 w-auto object-contain" src="/branding/LOGOTIPO.png" alt="ArenaX" />
-      <span className="h-9 w-9 rounded-full bg-emerald-100 text-center text-sm font-bold leading-9 text-emerald-800">{user?.name?.charAt(0).toUpperCase() ?? "A"}</span>
+      <span className="h-9 w-9 rounded-full bg-secondary text-center text-sm font-bold leading-9 text-primary">{user?.name?.charAt(0).toUpperCase() ?? "A"}</span>
     </header>
-    {open && <div className="fixed inset-0 z-50 lg:hidden"><button className="absolute inset-0 bg-slate-950/35" onClick={() => setOpen(false)} aria-label="Fechar menu" /><aside className="relative flex h-full w-[min(82vw,300px)] flex-col bg-card text-foreground shadow-2xl">{sidebar}</aside></div>}
+    {open && <div className="fixed inset-0 z-50 lg:hidden"><button className="absolute inset-0 bg-foreground/35" onClick={() => setOpen(false)} aria-label="Fechar menu" /><aside className="relative flex h-full w-[min(82vw,300px)] flex-col bg-card text-foreground shadow-2xl">{sidebar}</aside></div>}
     <div className="lg:pl-66">{children}</div>
   </div>;
 }

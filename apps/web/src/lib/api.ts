@@ -88,7 +88,10 @@ async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { ...(init?.body ? { "Content-Type": "application/json" } : {}), ...init?.headers },
   });
   if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { detail?: string; message?: string } | null;
+    const body = (await response.json().catch(() => null)) as { code?: string; detail?: string; message?: string } | null;
+    if (body?.code === "SessionConflict") {
+      throw new Error("Um ou mais Espaços já estão ocupados no período selecionado. Escolha outro horário.");
+    }
     throw new Error(body?.message ?? body?.detail ?? "Não foi possível concluir a operação.");
   }
   if (response.status === 204) return undefined as T;
@@ -107,6 +110,26 @@ export async function login(input: LoginInput): Promise<AuthenticatedUser> {
   }
   const result = (await response.json()) as { user: AuthenticatedUser };
   return result.user;
+}
+
+export type ForgotPasswordResult = {
+  message: string;
+  reset_url: string | null;
+  expires_at: string | null;
+};
+
+export function forgotPassword(email: string) {
+  return apiRequest<ForgotPasswordResult>("/api/v1/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function resetPassword(token: string, password: string) {
+  return apiRequest<void>("/api/v1/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, password }),
+  });
 }
 
 export async function logout(): Promise<void> {

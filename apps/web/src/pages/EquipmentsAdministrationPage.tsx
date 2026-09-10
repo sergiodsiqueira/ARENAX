@@ -1,3 +1,4 @@
+import { FormModal } from "../components/ui/form-modal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Camera,
@@ -17,8 +18,8 @@ import { ConfirmationAlertDialog } from "../components/ui/confirmation-alert-dia
 import { Combobox } from "../components/ui/combobox";
 import { Input } from "../components/ui/input";
 import { ModalCloseButton } from "../components/ui/modal-close-button";
-import { useModalEscape } from "../hooks/use-modal-escape";
 import { SearchInput } from "../components/ui/search-input";
+import { Hint } from "../components/ui/tooltip";
 import {
   createEquipment,
   deleteEquipment,
@@ -67,7 +68,6 @@ export function EquipmentsAdministrationPage() {
     [modal, setModal] = useState<Equipment | "new" | null>(null),
     [form, setForm] = useState<Form>(empty),
     [live, setLive] = useState<Equipment | null>(null);
-  useModalEscape(Boolean(modal) && !live, () => setModal(null));
   const user = useQuery({
       queryKey: ["current-user"],
       queryFn: getCurrentUser,
@@ -182,13 +182,13 @@ export function EquipmentsAdministrationPage() {
   };
   return (
     <AppShell user={user.data}>
-      <main className="mx-auto max-w-7xl px-5 py-8 sm:px-8">
+      <main className="page-shell">
         <header className="flex items-end justify-between">
           <div>
-            <p className="text-sm font-semibold text-emerald-700">
+            <p className="text-sm font-semibold text-primary">
               EQUIPAMENTOS
             </p>
-            <h1 className="mt-2 text-3xl font-semibold">
+            <h1 className="mt-2 page-heading">
               Cadastro de Equipamentos
             </h1>
           </div>
@@ -223,8 +223,8 @@ export function EquipmentsAdministrationPage() {
           />
         </div>
         <SearchInput className="mt-6" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Pesquisar Equipamentos" aria-label="Pesquisar Equipamentos" />
-        <section className="mt-4 overflow-hidden rounded-2xl border bg-white shadow-sm">
-          <div className="grid grid-cols-[80px_minmax(140px,0.8fr)_minmax(180px,1.2fr)_140px] border-b bg-slate-50 px-4 py-3 text-xs font-semibold uppercase text-slate-500">
+        <section className="mt-4 overflow-hidden rounded-2xl border bg-card shadow-sm">
+          <div className="grid grid-cols-[80px_minmax(140px,0.8fr)_minmax(180px,1.2fr)_140px] border-b bg-muted px-4 py-3 text-xs font-semibold uppercase text-muted-foreground">
             <span>Tipo</span>
             <span>ID</span>
             <span>Descrição</span>
@@ -236,28 +236,30 @@ export function EquipmentsAdministrationPage() {
               className="grid grid-cols-[80px_minmax(140px,0.8fr)_minmax(180px,1.2fr)_140px] items-center border-b px-4 py-4 last:border-0"
             >
               {x.kind === "camera" ? (
-                <button
-                  className="w-fit rounded-lg p-2 text-emerald-700 hover:bg-emerald-50"
-                  onClick={() => setLive(x)}
-                  aria-label={`Abrir transmissão ao vivo de ${x.external_id}`}
-                  title="Abrir Câmera ao vivo"
-                >
-                  <Camera />
-                </button>
+                <Hint label="Abrir Câmera ao vivo">
+                  <button
+                    className="w-fit rounded-lg p-2 text-primary hover:bg-secondary"
+                    onClick={() => setLive(x)}
+                    aria-label={`Abrir transmissão ao vivo de ${x.external_id}`}
+                  >
+                    <Camera />
+                  </button>
+                </Hint>
               ) : (
-                <button
-                  className="w-fit rounded-lg p-2 text-emerald-700 hover:bg-emerald-50"
-                  onClick={copyAxDeviceUrl}
-                  aria-label={`Copiar link de configuração de ${x.external_id}`}
-                  title="Copiar link do AX Device"
-                >
-                  <Radio />
-                </button>
+                <Hint label="Copiar link do AX Device">
+                  <button
+                    className="w-fit rounded-lg p-2 text-primary hover:bg-secondary"
+                    onClick={copyAxDeviceUrl}
+                    aria-label={`Copiar link de configuração de ${x.external_id}`}
+                  >
+                    <Radio />
+                  </button>
+                </Hint>
               )}
               <p className="font-semibold">{x.external_id}</p>
               <div>
-                <p className="font-medium text-slate-700">{x.description || "Sem descrição"}</p>
-                <p className="text-xs text-slate-400">
+                <p className="font-medium text-foreground">{x.description || "Sem descrição"}</p>
+                <p className="text-xs text-muted-foreground">
                   {x.kind === "camera" ? "Câmera" : "AX Device"} ·{" "}
                   {names.get(x.space_id)} ·{" "}
                   {x.administrative_status === "active" ? "Ativo" : "Inativo"}
@@ -265,7 +267,7 @@ export function EquipmentsAdministrationPage() {
               </div>
               <div className="flex gap-1">
                 <button
-                  className="rounded-lg p-2 hover:bg-slate-100"
+                  className="rounded-lg p-2 hover:bg-muted"
                   onClick={() => open(x)}
                 >
                   <Pencil size={17} />
@@ -276,21 +278,21 @@ export function EquipmentsAdministrationPage() {
                   confirmLabel="Excluir Equipamento"
                   pending={remove.isPending}
                   onConfirm={() => remove.mutate(x.id)}
-                  trigger={<button className="rounded-lg p-2 hover:bg-rose-50 hover:text-rose-700" aria-label={`Excluir ${x.external_id}`}><Trash2 size={17} /></button>}
+                  trigger={<button className="rounded-lg p-2 hover:bg-danger-muted hover:text-destructive" aria-label={`Excluir ${x.external_id}`}><Trash2 size={17} /></button>}
                 />
               </div>
             </div>
           ))}
           {!rows.length && (
-            <p className="p-10 text-center text-slate-500">
+            <p className="p-10 text-center text-muted-foreground">
               Nenhum Equipamento nesta seleção.
             </p>
           )}
         </section>
         {modal && (
-          <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 px-5">
+          <FormModal title="Equipamento" onClose={() => setModal(null)} size="md">
             <form
-              className="w-full max-w-xl rounded-2xl bg-white p-6"
+              className="w-full p-6"
               onSubmit={(e: FormEvent) => {
                 e.preventDefault();
                 save.mutate();
@@ -374,7 +376,7 @@ export function EquipmentsAdministrationPage() {
                 </button>
               </div>
             </form>
-          </div>
+          </FormModal>
         )}
         {live && (
           <CameraLiveModal
