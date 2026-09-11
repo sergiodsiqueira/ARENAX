@@ -34,7 +34,7 @@ Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -Fil
 
 [Icons]
 Name: "{group}\ARENAX"; Filename: "http://localhost"
-Name: "{group}\Criar primeiro Proprietário"; Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\scripts\distribution\create-owner.ps1"""
+Name: "{group}\Criar Proprietario"; Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\scripts\distribution\create-owner.ps1"""
 
 [UninstallRun]
 Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\scripts\distribution\uninstall.ps1"""; Flags: runhidden waituntilterminated; RunOnceId: "StopArenaX"

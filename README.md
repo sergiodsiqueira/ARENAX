@@ -75,8 +75,18 @@ padrão. Consulte `docs/06-Planning/CI-CD-Distribution-Plan.md`.
 
 ## Primeiro acesso
 
-Após executar as migrations, crie o primeiro proprietário sem registrar a senha
-no histórico do terminal:
+Na instalação de distribuição, o instalador cria o primeiro Proprietário para
+abrir o sistema pela primeira vez:
+
+```text
+Usuário: admin@local.com
+Senha: Arenax@Temp!2026
+```
+
+Troque essa senha temporária após o primeiro acesso.
+
+Em ambiente de desenvolvimento, após executar as migrations, crie o primeiro
+proprietário sem registrar a senha no histórico do terminal:
 
 ```powershell
 docker compose run --rm api python -m arenax.cli.create_user `

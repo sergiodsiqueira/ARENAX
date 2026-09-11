@@ -19,16 +19,29 @@ def parse_arguments():
         choices=[role.value for role in UserRole],
         default=UserRole.OWNER.value,
     )
+    parser.add_argument(
+        "--ignorar-se-existe",
+        action="store_true",
+        help="Nao falha quando ja existe um Usuario com o e-mail informado.",
+    )
     return parser.parse_args()
 
 
 async def create_user() -> None:
     arguments = parse_arguments()
+    normalized_email = arguments.email.strip().casefold()
+    if arguments.ignorar_se_existe:
+        async with SqlAlchemyUnitOfWork() as uow:
+            existing = await uow.get_user_by_email(normalized_email)
+            if existing:
+                print(f"Usuario ja existe: {existing.email} ({existing.role.value})")
+                return
+
     password = os.getenv("ARENAX_INITIAL_USER_PASSWORD") or getpass.getpass("Senha: ")
     service = UserAdministrationService(SqlAlchemyUnitOfWork, Argon2PasswordHasher())
     user = await service.create_user(
         arguments.nome,
-        arguments.email,
+        normalized_email,
         password,
         UserRole(arguments.papel),
         datetime.now(UTC),
