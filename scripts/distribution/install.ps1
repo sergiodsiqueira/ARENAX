@@ -28,4 +28,28 @@ foreach ($name in @("ARENAX_POSTGRES_PASSWORD", "ARENAX_LIVE_PATH_SECRET", "AREN
 
 Invoke-ArenaXCompose $root pull
 Invoke-ArenaXCompose $root up -d
-Write-Output "ARENAX $Version instalada. Execute create-owner.ps1 para criar o primeiro Proprietário."
+
+$initialOwnerEmail = "admin@local.com"
+$initialOwnerPassword = "Arenax@Temp!2026"
+$previousInitialUserPassword = [Environment]::GetEnvironmentVariable("ARENAX_INITIAL_USER_PASSWORD", "Process")
+try {
+    $env:ARENAX_INITIAL_USER_PASSWORD = $initialOwnerPassword
+    Invoke-ArenaXCompose $root run --rm -e ARENAX_INITIAL_USER_PASSWORD api python -m arenax.cli.create_user `
+        --nome "Administrador" `
+        --email $initialOwnerEmail `
+        --papel proprietario `
+        --ignorar-se-existe
+}
+finally {
+    if ($null -eq $previousInitialUserPassword) {
+        Remove-Item Env:ARENAX_INITIAL_USER_PASSWORD -ErrorAction SilentlyContinue
+    }
+    else {
+        $env:ARENAX_INITIAL_USER_PASSWORD = $previousInitialUserPassword
+    }
+}
+
+Write-Output "ARENAX $Version instalada."
+Write-Output "Usuario inicial: $initialOwnerEmail"
+Write-Output "Senha temporaria: $initialOwnerPassword"
+Write-Output "Troque a senha temporaria apos o primeiro acesso."
