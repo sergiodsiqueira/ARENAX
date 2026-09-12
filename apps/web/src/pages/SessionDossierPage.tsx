@@ -41,8 +41,12 @@ import {
   recalculateExpectedAmount,
   registerPayment,
   registerReplayShare,
+  requestReplayMoment,
   replayUrl,
+  subscribeToOperationalEvents,
   type PaymentMethod,
+  type SessionDossier,
+  type SessionMoment,
   type SessionStatus,
 } from "../lib/api";
 
@@ -92,6 +96,18 @@ const paymentLabels: Record<PaymentMethod, string> = {
   debit_card: "Cartão de débito",
   credit_card: "Cartão de crédito",
   other: "Outro",
+};
+const replayTerminalStatuses = new Set<SessionMoment["status"]>([
+  "ready",
+  "failed",
+  "expired",
+]);
+const replayStatusLabels: Record<SessionMoment["status"], string> = {
+  requested: "Solicitado",
+  processing: "Processando",
+  ready: "Pronto",
+  failed: "Falha",
+  expired: "Removido",
 };
 
 export function SessionDossierPage() {
@@ -146,7 +162,7 @@ export function SessionDossierPage() {
       query.state.data?.status === "in_progress" && query.state.data.calculate_actual_time
         ? 30_000
         : query.state.data?.moments.some(
-        (moment) => !["ready", "failed"].includes(moment.status),
+        (moment) => !replayTerminalStatuses.has(moment.status),
       )
         ? 3000
         : false,
@@ -156,6 +172,17 @@ export function SessionDossierPage() {
   useEffect(() => {
     if (user.isError) navigate("/login", { replace: true });
   }, [navigate, user.isError]);
+  useEffect(() => {
+    if (!user.data || !sessionId) return;
+    return subscribeToOperationalEvents(
+      (event) => {
+        if (event.resource === "sessions" && event.entity_id === sessionId) {
+          queryClient.invalidateQueries({ queryKey: ["session-dossier", sessionId] });
+        }
+      },
+      () => undefined,
+    );
+  }, [queryClient, sessionId, user.data]);
   const clientsById = useMemo(
     () => new Map((clients.data ?? []).map((client) => [client.id, client])),
     [clients.data],
@@ -231,6 +258,73 @@ export function SessionDossierPage() {
           : "Não foi possível recalcular o valor previsto.",
       ),
   });
+  const replayRequest = useMutation({
+    mutationFn: (spaceId: string) => requestReplayMoment(sessionId, spaceId),
+    onMutate: async (spaceId) => {
+      await queryClient.cancelQueries({ queryKey: ["session-dossier", sessionId] });
+      const previous = queryClient.getQueryData<SessionDossier>([
+        "session-dossier",
+        sessionId,
+      ]);
+      const optimisticId =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `pending-${Date.now()}`;
+      const optimisticMoment: SessionMoment = {
+        id: optimisticId,
+        session_id: sessionId,
+        space_id: spaceId,
+        occurred_at: new Date().toISOString(),
+        status: "requested",
+        replay_path: null,
+      };
+      queryClient.setQueryData<SessionDossier>(
+        ["session-dossier", sessionId],
+        (current) =>
+          current
+            ? { ...current, moments: [...current.moments, optimisticMoment] }
+            : current,
+      );
+      return { previous, optimisticId };
+    },
+    onSuccess: (moment, _spaceId, context) => {
+      queryClient.setQueryData<SessionDossier>(
+        ["session-dossier", sessionId],
+        (current) => {
+          if (!current) return current;
+          const nextMoment: SessionMoment = {
+            id: moment.id,
+            session_id: moment.session_id,
+            space_id: moment.space_id,
+            occurred_at: moment.occurred_at,
+            status: moment.status,
+            replay_path: moment.replay_path,
+          };
+          const hasMoment = current.moments.some((item) => item.id === moment.id);
+          return {
+            ...current,
+            moments: hasMoment
+              ? current.moments.map((item) =>
+                  item.id === moment.id ? nextMoment : item,
+                )
+              : current.moments.map((item) =>
+                  item.id === context?.optimisticId ? nextMoment : item,
+                ),
+          };
+        },
+      );
+      toast.success("Replay solicitado.");
+      queryClient.invalidateQueries({ queryKey: ["session-dossier", sessionId] });
+    },
+    onError: (error, _spaceId, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["session-dossier", sessionId], context.previous);
+      }
+      toast.error(
+        error instanceof Error ? error.message : "Nao foi possivel solicitar o Replay.",
+      );
+    },
+  });
   const shareReplay = async (momentId: string) => {
     try {
       const file = await getReplayFile(momentId);
@@ -299,6 +393,7 @@ export function SessionDossierPage() {
       </AppShell>
     );
   const session = dossier.data;
+  const canRequestReplay = session.status === "in_progress";
   const responsibleClient = clientsById.get(session.responsible_client_id);
   const sessionPayments = session.payments ?? [];
   return (
@@ -546,12 +641,33 @@ export function SessionDossierPage() {
         )}
         <div className="mt-7 grid gap-6 xl:grid-cols-[1.35fr_.65fr]">
           <section>
-            <div className="flex items-center gap-2">
-              <Film className="text-primary" size={21} />
-              <h2 className="text-xl font-semibold">Momentos e Replays</h2>
-              <span className="rounded-full bg-muted px-2 py-1 text-xs text-muted-foreground">
-                {session.moments.length}
-              </span>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2">
+                <Film className="text-primary" size={21} />
+                <h2 className="text-xl font-semibold">Momentos e Replays</h2>
+                <span className="rounded-full bg-muted px-2 py-1 text-xs text-muted-foreground">
+                  {session.moments.length}
+                </span>
+              </div>
+              {canRequestReplay && (
+                <div className="flex flex-wrap gap-2">
+                  {session.space_ids.map((spaceId) => (
+                    <button
+                      key={spaceId}
+                      className="operation-button operation-button-primary"
+                      disabled={replayRequest.isPending}
+                      type="button"
+                      onClick={() => replayRequest.mutate(spaceId)}
+                    >
+                      <CirclePlay size={16} />
+                      Gerar Replay
+                      {session.space_ids.length > 1
+                        ? ` ${spaceNames.get(spaceId) ?? "Espaco"}`
+                        : ""}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             {!session.moments.length && (
               <div className="mt-4 rounded-2xl border border-dashed border-border bg-card p-10 text-center text-muted-foreground">
@@ -571,6 +687,8 @@ export function SessionDossierPage() {
                       controls
                       preload="metadata"
                     />
+                  ) : moment.status === "requested" || moment.status === "processing" ? (
+                    <ReplaySkeleton />
                   ) : (
                     <div className="grid aspect-video place-items-center bg-foreground text-muted-foreground">
                       <div className="text-center">
@@ -596,7 +714,7 @@ export function SessionDossierPage() {
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {spaceNames.get(moment.space_id) ?? "Espaço desconhecido"}{" "}
-                      · {moment.status}
+                      · {replayStatusLabels[moment.status]}
                     </p>
                     {moment.status === "ready" && <div className="mt-4 flex gap-2 border-t border-border pt-4">
                       <a className="operation-button" href={replayUrl(moment.id)} download><Download size={16} /> Baixar</a>
@@ -650,6 +768,27 @@ function parseCurrencyInput(value: string) {
   if (!Number.isFinite(cents) || cents < 0)
     throw new Error("Informe um valor previsto válido.");
   return cents;
+}
+
+function ReplaySkeleton() {
+  return (
+    <div className="relative aspect-video overflow-hidden bg-media p-4 text-muted-foreground">
+      <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+      <div className="relative flex h-full flex-col justify-between">
+        <div className="flex items-center justify-between">
+          <div className="h-3 w-24 rounded-full bg-white/15" />
+          <div className="h-3 w-12 rounded-full bg-white/10" />
+        </div>
+        <div className="mx-auto grid h-14 w-14 place-items-center rounded-full border border-white/15 bg-white/10">
+          <CirclePlay size={26} />
+        </div>
+        <div>
+          <div className="h-3 w-36 rounded-full bg-white/15" />
+          <div className="mt-2 h-2 w-full rounded-full bg-white/10" />
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function Info({

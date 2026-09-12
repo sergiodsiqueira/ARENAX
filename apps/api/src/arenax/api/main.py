@@ -77,6 +77,7 @@ from .schemas import (
     LicenseStatusResponse,
     LoginRequest,
     LoginResponse,
+    MomentResponse,
     NamedResourceRequest,
     NamedResourceResponse,
     NetworkInterfaceResponse,
@@ -85,6 +86,7 @@ from .schemas import (
     PaymentResponse,
     PostalCodeResponse,
     RegisterPaymentRequest,
+    RequestReplayMomentRequest,
     ResetPasswordRequest,
     ResetUserPasswordRequest,
     SessionResponse,
@@ -705,6 +707,31 @@ async def get_session_dossier(
 
 
 @app.post(
+    "/api/v1/sessions/{session_id}/moments",
+    response_model=MomentResponse,
+    status_code=202,
+)
+async def request_replay_moment(
+    session_id: UUID,
+    request: RequestReplayMomentRequest,
+    _user: AuthenticatedUser,
+):
+    try:
+        moment = await sessions.request_replay(session_id, request.space_id, datetime.now(UTC))
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    operational_events.publish("sessions", session_id)
+    return MomentResponse(
+        id=moment.id,
+        session_id=moment.session_id,
+        space_id=moment.space_id,
+        occurred_at=moment.occurred_at,
+        status=moment.status.value,
+        replay_path=None,
+    )
+
+
+@app.post(
     "/api/v1/sessions/{session_id}/payments",
     response_model=PaymentResponse,
     status_code=201,
@@ -784,5 +811,7 @@ async def button_pressed(request: ButtonPressedRequest,
     if request.timestamp.tzinfo is None:
         raise HTTPException(422, "timestamp must include a timezone")
     result = await physical_events.button_pressed(request.device_id, request.timestamp, idempotency_key)
+    if result.accepted:
+        operational_events.publish("sessions", result.session_id)
     return ButtonPressedResponse(accepted=result.accepted, reason=result.reason,
         moment_id=result.moment_id, session_id=result.session_id)

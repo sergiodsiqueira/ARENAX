@@ -55,6 +55,26 @@ class SessionService:
                 raise EntityNotFound("Session not found")
             return dossier
 
+    async def request_replay(self, session_id: UUID, space_id: UUID, now: datetime) -> Moment:
+        async with self._uow_factory() as uow:
+            session = await uow.get_session(session_id, lock=True)
+            if not session:
+                raise EntityNotFound("Session not found")
+            if space_id not in session.space_ids:
+                raise ValueError("Espaço não pertence à Sessão")
+            if session.status.value != "in_progress":
+                raise ValueError("Replay só pode ser solicitado em Sessão em andamento")
+            moment = Moment(session.id, space_id, now)
+            await uow.add_moment(moment)
+            await uow.add_timeline(session.id, "MomentRequested", now, {"momentId": str(moment.id)})
+            await uow.add_outbox(
+                "ReplayRequested",
+                moment.id,
+                {"momentId": str(moment.id), "sessionId": str(session.id), "spaceId": str(space_id)},
+            )
+            await uow.commit()
+            return moment
+
     async def agenda(
         self, start: datetime, end: datetime, space_id: UUID | None = None
     ) -> list[Session]:
