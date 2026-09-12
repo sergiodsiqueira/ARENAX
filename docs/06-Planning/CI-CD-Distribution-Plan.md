@@ -8,10 +8,11 @@
 
 ## Direção escolhida para o MVP
 
-Adotar GitHub Actions, GitHub Container Registry (GHCR) e Inno Setup. O primeiro
-instalador terá o Docker Desktop ou um Docker Engine compatível como pré-requisito.
-Os serviços serão publicados como imagens versionadas, e o instalador Windows fará
-a configuração e inicialização da aplicação sem compilar código na Arena.
+Adotar GitHub Actions, GitHub Container Registry (GHCR), empacotamento offline de
+imagens Docker em `.tar` e Inno Setup. O instalador tera WSL2 e Docker Desktop, ou
+um Docker Engine compativel com Compose, como pre-requisitos. Os servicos serao
+publicados como imagens versionadas, empacotados no instalador e carregados na
+maquina da Arena sem compilar codigo e sem depender de internet no cliente.
 
 ### Versionamento e nomes oficiais
 
@@ -29,7 +30,9 @@ Artefatos esperados em cada GitHub Release:
 - `ArenaX-Setup-<versão>.exe`;
 - checksum SHA-256 do instalador;
 - notas da versão;
-- imagens versionadas da API, frontend, Capture Service e Replay Worker no GHCR.
+- imagens versionadas da API, frontend, Capture Service e Replay Worker no GHCR;
+- imagens Docker de runtime empacotadas dentro do instalador para uso offline,
+  incluindo PostgreSQL e MediaMTX.
 
 ## Fluxo planejado
 
@@ -48,10 +51,11 @@ Ao publicar uma tag no formato `vX.Y.Z`:
 
 1. Construir e versionar as imagens Docker.
 2. Publicar as imagens no GHCR.
-3. Montar o pacote de implantação para Windows.
-4. Gerar o instalador com Inno Setup.
-5. Calcular o checksum SHA-256.
-6. Criar uma GitHub Release e anexar os artefatos para download.
+3. Exportar as imagens de runtime em arquivos `.tar`.
+4. Montar o pacote de implantacao para Windows com scripts, Compose e imagens.
+5. Gerar o instalador com Inno Setup.
+6. Calcular o checksum SHA-256.
+7. Criar uma GitHub Release e anexar os artefatos para download.
 
 ## Trabalho necessário
 
@@ -66,6 +70,8 @@ Ao publicar uma tag no formato `vX.Y.Z`:
 8. Definir o onboarding para criação do primeiro Proprietário.
 9. Criar workflows de CI, publicação de imagens e GitHub Release.
 10. Criar e, antes da distribuição comercial, assinar digitalmente o instalador.
+11. Validar pre-requisitos WSL2/Docker antes de instalar.
+12. Gerar guia HTML para o time de TI do cliente.
 
 ## Restrições operacionais
 
@@ -76,6 +82,10 @@ Ao publicar uma tag no formato `vX.Y.Z`:
 - A desinstalação deve pedir confirmação separada antes de remover dados da Arena.
 - O enquadramento de licenciamento do Docker Desktop deve ser confirmado antes da
   distribuição comercial.
+- A instalacao por pendrive deve funcionar sem internet quando WSL2 e Docker ja
+  estiverem instalados e o daemon estiver em execucao.
+- Instalacoes novas pedem o primeiro Proprietario no instalador; atualizacoes nao
+  recriam usuarios e nao alteram dados existentes.
 
 ## Primeira etapa da retomada
 

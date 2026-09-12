@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ARENAX - Guia de Instalacao para TI</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --background: #f6f6f6;
+      --card: #ffffff;
+      --foreground: #262626;
+      --muted: #7b7f7d;
+      --primary: #285f55;
+      --secondary: #dff1e7;
+      --border: #e6ebe8;
+      --warning: #92400e;
+      --warning-bg: #fffbeb;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--background);
+      color: var(--foreground);
+      font: 16px/1.55 Inter, Segoe UI, Roboto, Arial, sans-serif;
+    }
+    main {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 40px 24px 56px;
+    }
+    header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 24px;
+      margin-bottom: 24px;
+    }
+    h1, h2, h3 { line-height: 1.2; margin: 0; }
+    h1 { font-size: 34px; color: var(--primary); }
+    h2 { margin-top: 32px; font-size: 22px; }
+    h3 { margin-top: 18px; font-size: 18px; }
+    p { margin: 10px 0 0; }
+    ul, ol { margin: 12px 0 0; padding-left: 24px; }
+    li + li { margin-top: 8px; }
+    code {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--secondary);
+      padding: 2px 6px;
+      color: var(--primary);
+      font-family: Consolas, Monaco, monospace;
+      font-size: 0.95em;
+    }
+    .card {
+      margin-top: 16px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--card);
+      padding: 18px;
+    }
+    .notice {
+      border-color: #fcd34d;
+      background: var(--warning-bg);
+      color: var(--warning);
+    }
+    .checklist li { padding-left: 2px; }
+    .muted { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>ARENAX - Guia de Instalacao para TI</h1>
+      <p class="muted">Use este guia para preparar uma maquina Windows e instalar ou atualizar a ARENAX a partir de um pendrive, sem internet.</p>
+    </header>
+
+    <section class="card notice">
+      <h2>Resumo rapido</h2>
+      <p>O instalador da ARENAX nao instala WSL2 nem Docker Desktop. Esses itens devem estar instalados e funcionando antes de executar o setup.</p>
+    </section>
+
+    <section class="card">
+      <h2>Pre-requisitos</h2>
+      <ul class="checklist">
+        <li>Windows 64 bits com virtualizacao habilitada na BIOS/UEFI.</li>
+        <li>WSL2 instalado e funcional.</li>
+        <li>Docker Desktop instalado, configurado para usar WSL2 e em execucao.</li>
+        <li>Docker Compose disponivel pelo comando <code>docker compose version</code>.</li>
+        <li>Porta HTTP 80 livre, ou outra porta definida pela equipe tecnica antes da instalacao.</li>
+        <li>Espaco em disco suficiente para imagens Docker, banco PostgreSQL e videos de Replay.</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Validacao antes do setup</h2>
+      <p>Abra o PowerShell como Administrador e valide:</p>
+      <ol>
+        <li><code>wsl.exe --status</code></li>
+        <li><code>docker version</code></li>
+        <li><code>docker compose version</code></li>
+      </ol>
+      <p>Se algum comando falhar, corrija WSL2/Docker antes de executar o instalador.</p>
+    </section>
+
+    <section class="card">
+      <h2>Instalacao nova pelo pendrive</h2>
+      <ol>
+        <li>Conecte o pendrive contendo <code>ArenaX-Setup-vX.Y.Z.exe</code>.</li>
+        <li>Confirme que o Docker Desktop esta aberto e com status running.</li>
+        <li>Execute o instalador como Administrador.</li>
+        <li>Informe nome, e-mail e senha do Proprietario inicial quando solicitado.</li>
+        <li>Aguarde o instalador carregar as imagens Docker, criar o banco, rodar as migrations e iniciar os servicos.</li>
+        <li>Abra <code>http://localhost</code> para acessar a ARENAX.</li>
+      </ol>
+    </section>
+
+    <section class="card">
+      <h2>Atualizacao de uma instalacao existente</h2>
+      <p>Ao detectar uma ARENAX instalada, o setup entra em modo atualizacao.</p>
+      <ul>
+        <li>Banco de dados, configuracoes, secrets e Replays sao preservados.</li>
+        <li>O instalador carrega as novas imagens Docker a partir do proprio setup.</li>
+        <li>Antes de migrar, o script gera backup do PostgreSQL em <code>ProgramData\ARENAX\backups</code>.</li>
+        <li>A atualizacao e bloqueada se houver Sessao em andamento.</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Dados preservados</h2>
+      <p>Por padrao, os dados ficam fora da pasta do aplicativo:</p>
+      <ul>
+        <li><code>ProgramData\ARENAX\postgres</code>: dados do PostgreSQL.</li>
+        <li><code>ProgramData\ARENAX\media</code>: arquivos de Replay e buffers de video.</li>
+        <li><code>Program Files\ARENAX\.env</code>: versao, caminhos e secrets da instalacao.</li>
+      </ul>
+      <p>Nao apague essas pastas durante atualizacoes.</p>
+    </section>
+
+    <section class="card">
+      <h2>Comandos uteis</h2>
+      <ul>
+        <li>Ver servicos: <code>docker compose --project-directory "C:\Program Files\ARENAX" -f "C:\Program Files\ARENAX\docker-compose.production.yml" ps</code></li>
+        <li>Parar ARENAX: <code>docker compose --project-directory "C:\Program Files\ARENAX" -f "C:\Program Files\ARENAX\docker-compose.production.yml" down</code></li>
+        <li>Ver logs da API: <code>docker logs arenax-api-1</code></li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

@@ -41,6 +41,37 @@ function Invoke-ArenaXCompose {
     if ($LASTEXITCODE -ne 0) { throw "Docker Compose falhou (código $LASTEXITCODE)." }
 }
 
+function Get-ArenaXImageDirectory {
+    param([string]$Root)
+    return Join-Path $Root "images"
+}
+
+function Import-ArenaXImages {
+    param([string]$Root)
+    $imageDirectory = Get-ArenaXImageDirectory $Root
+    if (-not (Test-Path -LiteralPath $imageDirectory)) {
+        Write-Output "Diretorio de imagens offline nao encontrado; usando imagens ja presentes ou registry configurado."
+        return
+    }
+
+    $archives = @(Get-ChildItem -LiteralPath $imageDirectory -Filter "*.tar" -File | Sort-Object Name)
+    if ($archives.Count -eq 0) {
+        Write-Output "Nenhuma imagem offline encontrada em $imageDirectory."
+        return
+    }
+
+    foreach ($archive in $archives) {
+        Write-Output "Carregando imagem Docker: $($archive.Name)"
+        & docker load --input $archive.FullName
+        if ($LASTEXITCODE -ne 0) { throw "Falha ao carregar imagem Docker $($archive.Name)." }
+    }
+}
+
+function Test-ArenaXInstalled {
+    param([string]$Root)
+    return Test-Path -LiteralPath (Join-Path $Root ".env")
+}
+
 function Assert-NoActiveSession {
     param([string]$Root)
     $result = & docker compose --project-directory $Root -f (Join-Path $Root "docker-compose.production.yml") exec -T postgres psql -U arenax -d arenax -tAc "SELECT count(*) FROM sessoes WHERE status = 'in_progress'" 2>$null
