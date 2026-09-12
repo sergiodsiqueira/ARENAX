@@ -66,24 +66,22 @@ temporais/de entrega estão nos ADRs 011 e 012.
 
 ## CI/CD e distribuição Windows
 
-Pull requests e commits em `main` executam testes, lint, builds, validação do
+Pull requests e commits em `main` executam testes, lint, builds, validacao do
 Compose e varredura de vulnerabilidades. Uma tag SemVer (`vX.Y.Z`) publica quatro
-imagens versionadas no GHCR e gera `ArenaX-Setup-<versão>.exe`, seu SHA-256 e uma
-GitHub Release. O ambiente instalado usa `docker-compose.production.yml`; banco,
-configuração e Replays ficam fora da pasta do aplicativo e são preservados por
-padrão. Consulte `docs/06-Planning/CI-CD-Distribution-Plan.md`.
+imagens versionadas no GHCR, empacota as imagens de runtime em arquivos `.tar` e
+gera `ArenaX-Setup-<versao>.exe`, seu SHA-256 e uma GitHub Release. O instalador
+pode ser executado a partir de um pendrive em maquinas sem internet, desde que
+WSL2 e Docker Desktop ja estejam instalados e funcionando.
+
+O ambiente instalado usa `docker-compose.production.yml`; banco, configuracao e
+Replays ficam fora da pasta do aplicativo e sao preservados por padrao. Consulte
+`docs/06-Planning/CI-CD-Distribution-Plan.md`.
 
 ## Primeiro acesso
 
-Na instalação de distribuição, o instalador cria o primeiro Proprietário para
-abrir o sistema pela primeira vez:
-
-```text
-Usuário: admin@local.com
-Senha: Arenax@Temp!2026
-```
-
-Troque essa senha temporária após o primeiro acesso.
+Na instalacao de distribuicao, o instalador solicita nome, e-mail e senha do
+primeiro Proprietario. Em atualizacoes, o instalador nao pede esse cadastro e nao
+toca nos Usuarios ja existentes.
 
 Em ambiente de desenvolvimento, após executar as migrations, crie o primeiro
 proprietário sem registrar a senha no histórico do terminal:
