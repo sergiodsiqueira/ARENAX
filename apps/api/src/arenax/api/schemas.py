@@ -42,6 +42,19 @@ class ButtonPressedResponse(BaseModel):
     session_id: UUID | None = None
 
 
+class RequestReplayMomentRequest(BaseModel):
+    space_id: UUID
+
+
+class MomentResponse(BaseModel):
+    id: UUID
+    session_id: UUID
+    space_id: UUID
+    occurred_at: datetime
+    status: str
+    replay_path: str | None = None
+
+
 class NamedResourceRequest(BaseModel):
     name: str = Field(min_length=1, max_length=160)
 

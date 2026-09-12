@@ -344,6 +344,19 @@ paths:
       responses:
         '200': {description: Session dossier including Moments and Timeline, content: {application/json: {schema: {$ref: '#/components/schemas/SessionDossier'}}}}
         '404': {description: Session not found}
+  /api/v1/sessions/{sessionId}/moments:
+    post:
+      operationId: requestReplayMoment
+      summary: Request a Moment and pending Replay from an authenticated operator action.
+      parameters:
+        - {name: sessionId, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/ReplayMomentRequest'}}}
+      responses:
+        '202': {description: Moment registered and Replay job enqueued, content: {application/json: {schema: {$ref: '#/components/schemas/Moment'}}}}
+        '404': {description: Session not found}
+        '422': {description: Session is not in progress or Space is not in the Session}
   /api/v1/sessions/{sessionId}/extend:
     post:
       operationId: extendSession
@@ -766,13 +779,19 @@ components:
             registered_by: {type: string, format: uuid}
     Moment:
       type: object
-      required: [id, space_id, occurred_at, status]
+      required: [id, session_id, space_id, occurred_at, status]
       properties:
         id: {type: string, format: uuid}
+        session_id: {type: string, format: uuid}
         space_id: {type: string, format: uuid}
         occurred_at: {type: string, format: date-time}
-        status: {type: string}
+        status: {type: string, enum: [requested, processing, ready, failed, expired]}
         replay_path: {type: [string, 'null']}
+    ReplayMomentRequest:
+      type: object
+      required: [space_id]
+      properties:
+        space_id: {type: string, format: uuid}
     TimelineEntry:
       type: object
       required: [kind, occurred_at, data]

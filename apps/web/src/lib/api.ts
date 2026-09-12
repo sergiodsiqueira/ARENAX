@@ -220,9 +220,10 @@ export function resetUserPassword(userId: string, password: string) {
 export type Equipment = { id: string; space_id: string; kind: "camera" | "ax_device"; external_id: string; description: string; configuration: Record<string, unknown>; administrative_status: "active" | "inactive" };
 export type SessionMoment = {
   id: string;
+  session_id: string;
   space_id: string;
   occurred_at: string;
-  status: string;
+  status: "requested" | "processing" | "ready" | "failed" | "expired";
   replay_path: string | null;
 };
 export type TimelineEntry = { kind: string; occurred_at: string; data: Record<string, unknown> };
@@ -243,6 +244,11 @@ export const updateEquipment = (equipmentId: string, input: Omit<Equipment, "id"
 export const deleteEquipment = (equipmentId: string) => apiRequest<void>(`/api/v1/equipments/${equipmentId}`, { method: "DELETE" });
 export const getCameraLive = (cameraId: string) => apiRequest<{ url: string }>(`/api/v1/cameras/${cameraId}/live`, { method: "POST" });
 export const getSessionDossier = (sessionId: string) => apiRequest<SessionDossier>(`/api/v1/sessions/${sessionId}`);
+export const requestReplayMoment = (sessionId: string, spaceId: string) =>
+  apiRequest<SessionMoment>(`/api/v1/sessions/${sessionId}/moments`, {
+    method: "POST",
+    body: JSON.stringify({ space_id: spaceId }),
+  });
 export const registerPayment = (sessionId: string, input: { amount_cents: number; method: PaymentMethod; note?: string }) =>
   apiRequest<SessionPayment>(`/api/v1/sessions/${sessionId}/payments`, { method: "POST", body: JSON.stringify(input) });
 export const changeExpectedAmount = (sessionId: string, amountCents: number) =>
