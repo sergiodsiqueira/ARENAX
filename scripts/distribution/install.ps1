@@ -52,20 +52,34 @@ foreach ($name in @("ARENAX_POSTGRES_PASSWORD", "ARENAX_LIVE_PATH_SECRET", "AREN
 
 Import-ArenaXImages $root
 if ($AllowRegistryPull) {
-    Invoke-ArenaXCompose $root pull
+    Invoke-ArenaXCompose -Root $root -Arguments @("pull")
 }
 
-Invoke-ArenaXCompose $root up -d postgres
-Invoke-ArenaXCompose $root run --rm migrate
+Invoke-ArenaXCompose -Root $root -Arguments @("up", "-d", "postgres")
+Wait-ArenaXPostgres $root
+Sync-ArenaXPostgresPassword $root
+Invoke-ArenaXCompose -Root $root -Arguments @("run", "--rm", "migrate")
 
 $previousInitialUserPassword = [Environment]::GetEnvironmentVariable("ARENAX_INITIAL_USER_PASSWORD", "Process")
 try {
     $env:ARENAX_INITIAL_USER_PASSWORD = $ownerPassword
-    Invoke-ArenaXCompose $root run --rm -e ARENAX_INITIAL_USER_PASSWORD api python -m arenax.cli.create_user `
-        --nome $ownerName `
-        --email $ownerEmail `
-        --papel proprietario `
-        --ignorar-se-existe
+    Invoke-ArenaXCompose -Root $root -Arguments @(
+        "run",
+        "--rm",
+        "-e",
+        "ARENAX_INITIAL_USER_PASSWORD",
+        "api",
+        "python",
+        "-m",
+        "arenax.cli.create_user",
+        "--nome",
+        $ownerName,
+        "--email",
+        $ownerEmail,
+        "--papel",
+        "proprietario",
+        "--ignorar-se-existe"
+    )
 }
 finally {
     if ($null -eq $previousInitialUserPassword) {
@@ -79,7 +93,7 @@ finally {
     }
 }
 
-Invoke-ArenaXCompose $root up -d
+Invoke-ArenaXCompose -Root $root -Arguments @("up", "-d")
 
 Write-Output "ARENAX $Version instalada."
 Write-Output "Usuario inicial: $ownerEmail"

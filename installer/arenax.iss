@@ -33,9 +33,9 @@ Source: "assets\arenax-ti-install-guide.html"; DestDir: "{app}\docs"; Flags: ign
 Source: "..\scripts\distribution\preflight.ps1"; Flags: dontcopy
 
 [Run]
-Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\scripts\distribution\install.ps1"" -Version ""{#MyAppVersion}"" -OwnerFile ""{code:GetOwnerFile}"" -SkipPreflight"; StatusMsg: "Instalando ARENAX..."; Flags: runhidden waituntilterminated; Check: ShouldInstallFresh
-Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\scripts\distribution\update.ps1"" -Version ""{#MyAppVersion}"" -SkipPreflight"; StatusMsg: "Atualizando ARENAX..."; Flags: runhidden waituntilterminated; Check: ShouldUpdateExisting
-Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\services\local-agent\install.ps1"""; StatusMsg: "Instalando Agente Local..."; Flags: runhidden waituntilterminated
+Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\scripts\distribution\install.ps1"" -Version ""{#MyAppVersion}"" -OwnerFile ""{code:GetOwnerFile}"" -SkipPreflight"; StatusMsg: "Instalando ARENAX... acompanhe os detalhes na janela do PowerShell."; Flags: waituntilterminated; Check: ShouldInstallFresh
+Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\scripts\distribution\update.ps1"" -Version ""{#MyAppVersion}"" -SkipPreflight"; StatusMsg: "Atualizando ARENAX... acompanhe os detalhes na janela do PowerShell."; Flags: waituntilterminated; Check: ShouldUpdateExisting
+Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\services\local-agent\install.ps1"""; StatusMsg: "Instalando Agente Local... acompanhe os detalhes na janela do PowerShell."; Flags: waituntilterminated
 
 [Icons]
 Name: "{group}\ARENAX"; Filename: "http://localhost"

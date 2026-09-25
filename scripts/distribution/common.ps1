@@ -20,7 +20,7 @@ function Read-ArenaXEnvironment {
 function New-ArenaXSecret {
     $bytes = New-Object byte[] 32
     [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
-    return [Convert]::ToBase64String($bytes)
+    return [Convert]::ToBase64String($bytes).TrimEnd("=").Replace("+", "-").Replace("/", "_")
 }
 
 function Set-ArenaXEnvironmentValue {
@@ -36,9 +36,86 @@ function Set-ArenaXEnvironmentValue {
 }
 
 function Invoke-ArenaXCompose {
-    param([string]$Root, [Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
+    param(
+        [string]$Root,
+        [Parameter(Mandatory = $true)][string[]]$Arguments
+    )
     & docker compose --project-directory $Root -f (Join-Path $Root "docker-compose.production.yml") @Arguments
     if ($LASTEXITCODE -ne 0) { throw "Docker Compose falhou (código $LASTEXITCODE)." }
+}
+
+function Wait-ArenaXPostgres {
+    param([string]$Root)
+    $arguments = @(
+        "compose",
+        "--project-directory",
+        $Root,
+        "-f",
+        (Join-Path $Root "docker-compose.production.yml"),
+        "exec",
+        "-T",
+        "postgres",
+        "psql",
+        "-U",
+        "arenax",
+        "-d",
+        "arenax",
+        "-tAc",
+        "SELECT 1"
+    )
+
+    for ($attempt = 1; $attempt -le 60; $attempt++) {
+        $previousErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            $first = & docker @arguments 2>$null
+            $firstExitCode = $LASTEXITCODE
+        }
+        catch {
+            $first = ""
+            $firstExitCode = 1
+        }
+        finally {
+            $ErrorActionPreference = $previousErrorActionPreference
+        }
+
+        if ($firstExitCode -eq 0 -and $first.Trim() -eq "1") {
+            Start-Sleep -Seconds 2
+            $previousErrorActionPreference = $ErrorActionPreference
+            $ErrorActionPreference = "Continue"
+            try {
+                $second = & docker @arguments 2>$null
+                $secondExitCode = $LASTEXITCODE
+            }
+            catch {
+                $second = ""
+                $secondExitCode = 1
+            }
+            finally {
+                $ErrorActionPreference = $previousErrorActionPreference
+            }
+
+            if ($secondExitCode -eq 0 -and $second.Trim() -eq "1") {
+                return
+            }
+        }
+        Start-Sleep -Seconds 2
+    }
+
+    throw "PostgreSQL da ARENAX nao ficou pronto para migrations."
+}
+
+function Sync-ArenaXPostgresPassword {
+    param([string]$Root)
+    $environment = Read-ArenaXEnvironment $Root
+    if (-not $environment.ContainsKey("ARENAX_POSTGRES_PASSWORD") -or [string]::IsNullOrWhiteSpace($environment["ARENAX_POSTGRES_PASSWORD"])) {
+        throw "ARENAX_POSTGRES_PASSWORD nao foi definida."
+    }
+
+    $password = $environment["ARENAX_POSTGRES_PASSWORD"].Replace("'", "''")
+    $sql = "ALTER USER arenax WITH PASSWORD '$password';"
+    & docker compose --project-directory $Root -f (Join-Path $Root "docker-compose.production.yml") exec -T postgres psql -U arenax -d arenax -c $sql
+    if ($LASTEXITCODE -ne 0) { throw "Nao foi possivel alinhar a senha do PostgreSQL da ARENAX." }
 }
 
 function Get-ArenaXImageDirectory {
