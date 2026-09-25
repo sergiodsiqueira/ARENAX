@@ -20,21 +20,23 @@ if (-not $SkipPreflight) {
 
 Import-ArenaXImages $root
 if ($AllowRegistryPull) {
-    Invoke-ArenaXCompose $root pull postgres
+    Invoke-ArenaXCompose -Root $root -Arguments @("pull", "postgres")
 }
-Invoke-ArenaXCompose $root up -d postgres
+Invoke-ArenaXCompose -Root $root -Arguments @("up", "-d", "postgres")
+Wait-ArenaXPostgres $root
+Sync-ArenaXPostgresPassword $root
 Assert-NoActiveSession $root
 $backup = Backup-ArenaXDatabase $root
 try {
     Set-ArenaXEnvironmentValue $environmentFile "ARENAX_VERSION" $Version
     if ($AllowRegistryPull) {
-        Invoke-ArenaXCompose $root pull
+        Invoke-ArenaXCompose -Root $root -Arguments @("pull")
     }
-    Invoke-ArenaXCompose $root run --rm migrate
-    Invoke-ArenaXCompose $root up -d
+    Invoke-ArenaXCompose -Root $root -Arguments @("run", "--rm", "migrate")
+    Invoke-ArenaXCompose -Root $root -Arguments @("up", "-d")
 } catch {
     Set-ArenaXEnvironmentValue $environmentFile "ARENAX_VERSION" $previousVersion
-    try { Invoke-ArenaXCompose $root up -d } catch { Write-Warning "A versao anterior exige recuperacao manual." }
+    try { Invoke-ArenaXCompose -Root $root -Arguments @("up", "-d") } catch { Write-Warning "A versao anterior exige recuperacao manual." }
     throw "Atualizacao interrompida. A versao anterior foi restaurada e o backup esta em $backup. $($_.Exception.Message)"
 }
 Write-Output "ARENAX atualizada de $previousVersion para $Version. Backup: $backup"

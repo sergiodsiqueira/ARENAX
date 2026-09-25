@@ -2,7 +2,7 @@ param([switch]$RemoveData)
 
 . (Join-Path $PSScriptRoot "common.ps1")
 $root = Get-ArenaXRoot
-Invoke-ArenaXCompose $root down
+Invoke-ArenaXCompose -Root $root -Arguments @("down")
 
 if ($RemoveData) {
     $confirmation = Read-Host "Digite REMOVER DADOS para apagar banco, configurações e Replays"

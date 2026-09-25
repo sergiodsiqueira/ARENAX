@@ -2,4 +2,17 @@ param([string]$Name = "Proprietário", [Parameter(Mandatory = $true)][string]$Em
 
 . (Join-Path $PSScriptRoot "common.ps1")
 $root = Get-ArenaXRoot
-Invoke-ArenaXCompose $root run --rm api python -m arenax.cli.create_user --nome $Name --email $Email --papel proprietario
+Invoke-ArenaXCompose -Root $root -Arguments @(
+    "run",
+    "--rm",
+    "api",
+    "python",
+    "-m",
+    "arenax.cli.create_user",
+    "--nome",
+    $Name,
+    "--email",
+    $Email,
+    "--papel",
+    "proprietario"
+)
